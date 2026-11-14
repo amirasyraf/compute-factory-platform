@@ -1,0 +1,4 @@
+---
+- name: Explain unsupported Windows access stage
+  ansible.builtin.fail:
+    msg: Windows access tasks are not implemented in POC.

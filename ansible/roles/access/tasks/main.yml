@@ -1,0 +1,4 @@
+---
+- name: Load OS-family tasks
+  ansible.builtin.include_tasks:
+    file: "{{ 'windows' if ansible_facts.os_family == 'Windows' else 'linux' }}.yml"

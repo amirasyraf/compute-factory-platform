@@ -1,0 +1,6 @@
+---
+# Future implementation, over SSH with ansible_shell_type=powershell:
+# winget install --id {{ cf_catalog[item].windows }} --silent --accept-package-agreements --accept-source-agreements
+- name: Explain unsupported Windows software stage
+  ansible.builtin.fail:
+    msg: Windows winget software installation is not implemented in POC.

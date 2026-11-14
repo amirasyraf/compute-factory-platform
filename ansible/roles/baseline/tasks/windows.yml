@@ -1,0 +1,4 @@
+---
+- name: Explain unsupported Windows baseline
+  ansible.builtin.fail:
+    msg: Windows baseline tasks are not implemented in POC.

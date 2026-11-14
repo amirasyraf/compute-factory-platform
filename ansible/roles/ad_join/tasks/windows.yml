@@ -1,0 +1,4 @@
+---
+- name: Explain unsupported Windows mock join
+  ansible.builtin.fail:
+    msg: Windows mock AD join tasks are not implemented in POC.

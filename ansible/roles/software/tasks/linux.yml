@@ -1,0 +1,9 @@
+---
+- name: Install catalog packages
+  ansible.builtin.apt:
+    name: "{{ cf_software | map('extract', cf_catalog, 'linux') | list }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 600
+  when: cf_software | length > 0

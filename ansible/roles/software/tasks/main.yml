@@ -1,0 +1,13 @@
+---
+- name: Choose software catalog OS
+  ansible.builtin.set_fact:
+    cf_catalog_os: "{{ 'windows' if ansible_facts.os_family == 'Windows' else 'linux' }}"
+- name: Validate software selections before installing anything
+  ansible.builtin.assert:
+    that:
+      - item in cf_catalog
+      - cf_catalog.get(item, {}).get(cf_catalog_os) is not none
+    fail_msg: "Software '{{ item }}' is unknown or unavailable for {{ cf_catalog_os }}."
+  loop: "{{ cf_software }}"
+- name: Load OS-family tasks
+  ansible.builtin.include_tasks: "{{ cf_catalog_os }}.yml"

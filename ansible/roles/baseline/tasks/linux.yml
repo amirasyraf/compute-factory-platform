@@ -1,0 +1,50 @@
+---
+- name: Set VM hostname
+  ansible.builtin.hostname:
+    name: "{{ cf_vm_name }}"
+- name: Resolve the VM hostname locally
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ cf_vm_name }}"
+- name: Set UTC timezone
+  ansible.builtin.file:
+    src: /usr/share/zoneinfo/UTC
+    dest: /etc/localtime
+    state: link
+    force: true
+- name: Write login banner and MOTD
+  ansible.builtin.copy:
+    dest: "{{ item }}"
+    content: |
+      Compute Factory
+      VM: {{ cf_vm_name }}
+      Team: {{ cf_team }}
+      Requester: {{ cf_requested_by }}
+      Platform: {{ cf_platform }}
+    mode: "0644"
+  loop:
+    - /etc/issue.net
+    - /etc/motd
+- name: Enable SSH login banner
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-compute-factory-banner.conf
+    content: "Banner /etc/issue.net\n"
+    mode: "0644"
+- name: Validate banner SSH configuration
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+- name: Reload SSH banner configuration
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+- name: Create VM metadata directory
+  ansible.builtin.file:
+    path: /etc/compute-factory
+    state: directory
+    mode: "0755"
+- name: Record VM metadata
+  ansible.builtin.copy:
+    dest: /etc/compute-factory/vm-info.json
+    content: "{{ {'name': cf_vm_name, 'team': cf_team, 'requested_by': cf_requested_by, 'platform': cf_platform, 'os': cf_os} | to_nice_json }}\n"
+    mode: "0644"

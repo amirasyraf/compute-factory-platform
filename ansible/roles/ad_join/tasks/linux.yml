@@ -1,0 +1,28 @@
+---
+- name: Create mock join metadata directory
+  ansible.builtin.file:
+    path: /etc/compute-factory
+    state: directory
+    mode: "0755"
+- name: Record mock domain join (no actual AD changes)
+  ansible.builtin.copy:
+    dest: /etc/compute-factory/ad-join.json
+    content: "{{ {'mock': true, 'domain': cf_ad_domain, 'ou': 'OU=ComputeFactory,DC=' + (cf_ad_domain | replace('.', ',DC=')), 'timestamp': ansible_facts.date_time.iso8601} | to_nice_json }}\n"
+    mode: "0644"
+- name: Mark mock join in banners
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: '^AD join \(MOCK\):'
+    line: "AD join (MOCK): joined {{ cf_ad_domain | upper }}"
+    create: true
+    mode: "0644"
+  loop:
+    - /etc/motd
+    - /etc/issue.net
+- name: Log mock join
+  ansible.builtin.command:
+    argv: [logger, --tag, compute-factory, "MOCK joined {{ cf_ad_domain | upper }}"]
+  changed_when: false
+- name: Report mock join
+  ansible.builtin.debug:
+    msg: "MOCK joined {{ cf_ad_domain | upper }} (no real AD changes)"
