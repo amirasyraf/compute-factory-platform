@@ -14,9 +14,11 @@
     state: link
     force: true
 - name: Write login banner and MOTD
-  ansible.builtin.copy:
-    dest: "{{ item }}"
-    content: |
+  ansible.builtin.blockinfile:
+    path: "{{ item }}"
+    create: true
+    marker: "# {mark} compute-factory baseline"
+    block: |
       Compute Factory
       VM: {{ cf_vm_name }}
       Team: {{ cf_team }}
