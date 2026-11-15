@@ -38,3 +38,13 @@ variable "requested_by" {
   default     = ""
   description = "Initiating Backstage user."
 }
+
+variable "cloud_tags" {
+  type        = map(string)
+  default     = {}
+  description = "Validated custom and informational billing tags from the VM spec."
+  validation {
+    condition     = alltrue([for key in keys(var.cloud_tags) : !startswith(lower(key), "cf:") && !startswith(lower(key), "aws:") && lower(key) != "name"])
+    error_message = "Cloud tags cannot override Name or reserved cf:/aws: tags."
+  }
+}

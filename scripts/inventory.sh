@@ -2,23 +2,29 @@
 set -euo pipefail
 # All inventory mutations are confined to one VM. Workflow-level concurrency serializes that VM.
 [[ "${NAME:?}" =~ ^[a-z][a-z0-9-]{2,20}$ ]] || { echo 'Invalid VM name' >&2; exit 1; }
-action=${1:?register, update, outputs, failure or delete}
+action=${1:?register, configure, update, outputs, failure or delete}
 file="vms/$NAME/catalog-info.yaml"
 export NAME
 case "$action" in
   register)
     [[ ! -e "vms/$NAME" ]] || { echo 'VM already exists' >&2; exit 1; }
+    SPEC_JSON=$(python3 scripts/spec.py <<< "${SPEC_JSON:?}")
+    # shellcheck source=scripts/load-spec.sh
+    source "$(dirname "$0")/load-spec.sh"
+    spec_environment
     mkdir -p "vms/$NAME"
     jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" \
-      --arg size "$SIZE" --arg software "$SOFTWARE" --argjson ad_join "$AD_JOIN" \
-      --arg requested_by "$REQUESTED_BY" --arg requested_at "$(date -u +%FT%TZ)" --arg run_id "$GITHUB_RUN_ID" \
-      '{name:$name,team:$team,platform:$platform,os:$os,size:$size,software:($software|if .=="" then [] else split(",") end),ad_join:$ad_join,requested_by:$requested_by,requested_at:$requested_at,run_id:$run_id}' \
-      | yq -P '.' > "vms/$NAME/request.yaml"
-    jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" \
-      --arg size "$SIZE" --arg software "$SOFTWARE" --arg user "$REQUESTED_BY" --arg run "$GITHUB_RUN_ID" \
+      --arg size "$SIZE" --arg user "$REQUESTED_BY" --arg run "$GITHUB_RUN_ID" \
+      --arg requested_at "$(date -u +%FT%TZ)" --argjson spec "$SPEC_JSON" \
       --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/platform":$platform,"cf/os":$os,"cf/size":$size,"cf/team":$team,"cf/software":$software,"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/run-id":$run,"cf/run-url":$url}},spec:{type:"vm",owner:("group:default/"+$team),lifecycle:"poc"}}' \
+      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/run-id":$run,"cf/run-url":$url}},spec:$spec}' \
       | yq -P '.' > "$file"
+    ;;
+  configure)
+    [[ -f "$file" ]] || exit 1
+    configuration=$(python3 scripts/spec.py <<< "${SPEC_JSON:?}" | jq -c '.configuration')
+    export configuration
+    yq -i '.spec.configuration = (strenv(configuration) | from_json)' "$file"
     ;;
   update)
     [[ -f "$file" ]] || exit 1

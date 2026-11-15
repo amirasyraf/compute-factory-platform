@@ -27,7 +27,7 @@ spec:
           enum: [baseline, software, ad-join, access]
           default: software
         software:
-          title: Software (only used for software stage)
+          title: Desired software (saved before software refry; installs are additive)
           type: array
           default: []
           uniqueItems: true
@@ -52,7 +52,7 @@ spec:
         workflowInputs:
           name: ${{ steps.vm.output.entity.metadata.name }}
           stage: ${{ parameters.stage }}
-          software: ${{ parameters.software | join(',') }}
+          software: ${{ parameters.software | dump }}
           requested_by: ${{ user.entity.metadata.name }}
           requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
     - id: monitor

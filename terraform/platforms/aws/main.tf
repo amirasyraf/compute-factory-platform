@@ -11,11 +11,11 @@ terraform {
 
 provider "aws" {
   default_tags {
-    tags = {
+    tags = merge(var.cloud_tags, {
       "cf:poc"  = "true"
       "cf:vm"   = var.name
       "cf:team" = var.team
-    }
+    })
   }
 }
 

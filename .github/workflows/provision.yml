@@ -6,27 +6,9 @@ on:
       name:
         type: string
         required: true
-      team:
+      spec_json:
+        description: Desired Resource spec as JSON (compute, configuration, optional billing and cloudTags)
         type: string
-        required: true
-      platform:
-        type: string
-        default: aws
-        required: true
-      os:
-        type: string
-        default: ubuntu
-        required: true
-      size:
-        type: string
-        default: S
-        required: true
-      software:
-        type: string
-        default: ''
-      ad_join:
-        type: string
-        default: 'false'
         required: true
       requested_by:
         type: string
@@ -42,12 +24,7 @@ permissions:
   id-token: write
 env:
   NAME: ${{ inputs.name }}
-  TEAM: ${{ inputs.team }}
-  PLATFORM: ${{ inputs.platform }}
-  OS: ${{ inputs.os }}
-  SIZE: ${{ inputs.size }}
-  SOFTWARE: ${{ inputs.software }}
-  AD_JOIN: ${{ inputs.ad_join }}
+  SPEC_JSON: ${{ inputs.spec_json }}
   REQUESTED_BY: ${{ inputs.requested_by }}
   REQUESTER_TEAMS: ${{ inputs.requester_teams }}
   BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
@@ -60,6 +37,7 @@ jobs:
     outputs:
       team: ${{ steps.validate.outputs.team }}
       vars_json: ${{ steps.validate.outputs.vars_json }}
+      spec_json: ${{ steps.validate.outputs.spec_json }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,7 +48,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     env:
-      TEAM: ${{ needs.validate.outputs.team }}
+      SPEC_JSON: ${{ needs.validate.outputs.spec_json }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,11 +58,13 @@ jobs:
     needs: [validate, register]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      TEAM: ${{ needs.validate.outputs.team }}
     outputs:
       host: ${{ steps.apply.outputs.host }}
       ssh_user: ${{ steps.apply.outputs.ssh_user }}
+      os: ${{ steps.apply.outputs.os }}
+      software: ${{ steps.apply.outputs.software }}
+      ad_join: ${{ steps.apply.outputs.ad_join }}
+      vars_json: ${{ steps.apply.outputs.vars_json }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -107,25 +87,25 @@ jobs:
       stage: baseline
       host: ${{ needs.provision.outputs.host }}
       ssh_user: ${{ needs.provision.outputs.ssh_user }}
-      os: ${{ inputs.os }}
-      vars_json: ${{ needs.validate.outputs.vars_json }}
+      os: ${{ needs.provision.outputs.os }}
+      vars_json: ${{ needs.provision.outputs.vars_json }}
     secrets: inherit
   fry-software:
     needs: [validate, provision, fry-baseline]
-    if: inputs.software != ''
+    if: needs.provision.outputs.software != '[]'
     uses: ./.github/workflows/_fry-stage.yml
     with:
       name: ${{ inputs.name }}
       stage: software
       host: ${{ needs.provision.outputs.host }}
       ssh_user: ${{ needs.provision.outputs.ssh_user }}
-      os: ${{ inputs.os }}
-      vars_json: ${{ needs.validate.outputs.vars_json }}
+      os: ${{ needs.provision.outputs.os }}
+      vars_json: ${{ needs.provision.outputs.vars_json }}
     secrets: inherit
   fry-ad-join:
     needs: [validate, provision, fry-baseline, fry-software]
     if: >-
-      always() && !cancelled() && inputs.ad_join == 'true' &&
+      always() && !cancelled() && needs.provision.outputs.ad_join == 'true' &&
       needs.fry-baseline.result == 'success' &&
       (needs.fry-software.result == 'success' || needs.fry-software.result == 'skipped')
     uses: ./.github/workflows/_fry-stage.yml
@@ -134,8 +114,8 @@ jobs:
       stage: ad-join
       host: ${{ needs.provision.outputs.host }}
       ssh_user: ${{ needs.provision.outputs.ssh_user }}
-      os: ${{ inputs.os }}
-      vars_json: ${{ needs.validate.outputs.vars_json }}
+      os: ${{ needs.provision.outputs.os }}
+      vars_json: ${{ needs.provision.outputs.vars_json }}
     secrets: inherit
   fry-access:
     needs: [validate, provision, fry-baseline, fry-software, fry-ad-join]
@@ -149,8 +129,8 @@ jobs:
       stage: access
       host: ${{ needs.provision.outputs.host }}
       ssh_user: ${{ needs.provision.outputs.ssh_user }}
-      os: ${{ inputs.os }}
-      vars_json: ${{ needs.validate.outputs.vars_json }}
+      os: ${{ needs.provision.outputs.os }}
+      vars_json: ${{ needs.provision.outputs.vars_json }}
     secrets: inherit
   finalize:
     needs: [fry-access]

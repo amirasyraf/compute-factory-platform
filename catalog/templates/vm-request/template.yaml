@@ -9,7 +9,7 @@ spec:
   type: infrastructure
   parameters:
     - title: VM request
-      required: [name, team, platform, os, size, ad_join]
+      required: [name, team, compute, configuration]
       properties:
         name:
           title: VM name
@@ -20,34 +20,75 @@ spec:
           title: Owning team
           type: string
           ui:field: MyGroupsPicker
-        platform:
-          title: Platform
-          type: string
-          default: aws
-          enum: [aws]
-        os:
-          title: Operating system
-          type: string
-          default: ubuntu
-          enum: [ubuntu]
-        size:
-          title: Size
-          type: string
-          default: S
-          enum: [S, M, L]
-        software:
-          title: Software
-          type: array
-          default: []
-          uniqueItems: true
-          items:
+        compute:
+          title: Compute
+          type: object
+          additionalProperties: false
+          required: [platform, os, size]
+          properties:
+            platform:
+              title: Platform
+              type: string
+              default: aws
+              enum: [aws]
+            os:
+              title: Operating system
+              type: string
+              default: ubuntu
+              enum: [ubuntu]
+            size:
+              title: Size
+              type: string
+              default: S
+              enum: [S, M, L]
+        configuration:
+          title: Configuration
+          type: object
+          additionalProperties: false
+          required: [software, adJoin]
+          properties:
+            software:
+              title: Software
+              type: array
+              default: []
+              uniqueItems: true
+              items:
+                type: string
+                enum: [git, htop, nginx, docker]
+              ui:widget: checkboxes
+            adJoin:
+              title: Join AD (mock)
+              type: boolean
+              default: false
+        billing:
+          title: Billing metadata (optional, self-reported)
+          description: Informational AWS tags, not billing authorization. Do not enter secrets.
+          type: object
+          additionalProperties: false
+          default: {}
+          properties:
+            costCenter:
+              title: Cost center
+              type: string
+              minLength: 1
+              maxLength: 256
+            projectCode:
+              title: Project code
+              type: string
+              minLength: 1
+              maxLength: 256
+        cloudTags:
+          title: Additional AWS tags (optional)
+          description: 'Up to 40 string tags. Name and cf:/aws:/billing: prefixes are reserved. No secrets.'
+          type: object
+          default: {}
+          maxProperties: 40
+          propertyNames:
+            maxLength: 128
+            minLength: 1
+          additionalProperties:
             type: string
-            enum: [git, htop, nginx, docker]
-          ui:widget: checkboxes
-        ad_join:
-          title: Join AD (mock)
-          type: boolean
-          default: false
+            maxLength: 256
   steps:
     - id: dispatch
       name: Start VM pipeline
@@ -59,12 +100,10 @@ spec:
         returnWorkflowRunDetails: true
         workflowInputs:
           name: ${{ parameters.name }}
-          team: ${{ parameters.team }}
-          platform: ${{ parameters.platform }}
-          os: ${{ parameters.os }}
-          size: ${{ parameters.size }}
-          software: ${{ parameters.software | join(',') }}
-          ad_join: ${{ parameters.ad_join | dump }}
+          spec_json: >-
+            {"type":"vm","owner":${{ parameters.team | dump }},"lifecycle":"poc",
+            "compute":${{ parameters.compute | dump }},"configuration":${{ parameters.configuration | dump }},
+            "billing":${{ parameters.billing | default({}) | dump }},"cloudTags":${{ parameters.cloudTags | default({}) | dump }}}
           requested_by: ${{ user.entity.metadata.name }}
           requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
     - id: monitor

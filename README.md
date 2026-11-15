@@ -10,8 +10,10 @@ mock AD join → access → ready. Every inventory transition is committed to `m
 records both the five user-facing `cf/stages` and the complete nine-job `cf/processes` graph. Running
 processes are marked failed if a job fails. Failed VMs remain available for diagnosis.
 
-`fry.yml` re-runs one fry stage using the host and SSH user in the VM entity. It does not
-rewrite the original request. Software installs are additive; an empty selection installs nothing.
+`fry.yml` re-runs one fry stage using the host and SSH user in the VM entity. Before applying,
+software refry saves the selected list in `spec.configuration.software`; AD refry sets
+`spec.configuration.adJoin=true`. Other desired settings and original requester provenance are
+preserved. Software installs are additive: removing an entry from desired software does not uninstall it.
 `destroy.yml` checks ownership, marks destroying, destroys the VM, deletes its S3 state object,
 then removes `vms/<name>/`. The VM catalog entity is subsequently orphaned and deleted.
 
@@ -19,12 +21,54 @@ All three entry points share concurrency group `vm-<name>`, so operations on the
 are serialized. Distinct VMs can run concurrently. Inventory commits retry pull/rebase/push
 five times, using rebase autostash to preserve unrelated working-tree changes. Backstage refresh
 is best-effort and bounded to ten seconds per entity.
-`vms/.gitkeep` is permanent; each registered VM has `request.yaml` and `catalog-info.yaml`. The portal
+`vms/.gitkeep` is permanent; each registered VM has only `catalog-info.yaml`. The portal
 request task and VM page both read this catalog projection, while the request, refry and destroy tasks
 stream their GitHub Actions jobs and steps directly. Users can see validation, registration, Terraform,
 every fry job, finalization, deletion and failure handling without repository access.
 
 ## Configuration and trust
+
+### One desired-configuration source
+
+The request template dispatches `name`, `spec_json`, `requested_by` and `requester_teams`.
+`spec_json` is a JSON Resource spec; identity/group claims remain server-supplied authorization
+context, not user-editable desired state. Validation normalizes the owner to `group:default/<team>`
+and commits the spec in `vms/<name>/catalog-info.yaml`. There is no separate `request.yaml`, and no
+duplicated desired `cf/platform`, `cf/os`, `cf/size`, `cf/team` or `cf/software` annotations.
+
+```yaml
+spec:
+  type: vm
+  owner: group:default/alpha
+  lifecycle: poc
+  compute: {platform: aws, os: ubuntu, size: S}
+  configuration: {software: [git, nginx], adJoin: false}
+  billing: {costCenter: CC-1234, projectCode: PROJ-5678}
+  cloudTags: {environment: test}
+```
+
+Terraform reads this persisted spec and generates a private, temporary `.tfvars.json` file, deleted on
+exit. Downstream Ansible inputs and optional-job decisions also derive from the entity after
+provisioning, not the initial dispatch environment. Existing-operation guards derive the team from
+`spec.owner`. Annotations contain observed state (status, stages, IP, instance ID, current run) and
+request provenance (`cf/requested-by`, `cf/requested-at`). Status writes do not change desired spec.
+
+`scripts/spec.py` validates types and supported fields at workflow boundaries (Python 3 standard
+library). It rejects unsupported compute/software, unknown section fields, malformed owner refs,
+string booleans, duplicate software, control characters, more than 40 custom tags, and reserved tag
+keys (`Name`, `cf:`, `aws:`, `billing:`; case-insensitive). Custom tag keys are 1–128 characters;
+values are strings up to 256 characters. Optional billing keys are `costCenter` and `projectCode`,
+nonempty strings up to 256 characters, mapped to AWS `billing:cost-center`/`billing:project-code`
+tags. These are self-reported metadata, not validated organizational billing authorization.
+Mandatory POC/ownership tags remain platform-controlled. No secrets belong in catalog specs or tags.
+Optional configuration defaults to no software/no AD join; billing and tags default to empty objects.
+
+This is an extensible, explicitly validated contract, not a catch-all for arbitrary unvalidated input.
+Add future enterprise sections with validators, consumers and documentation. Backstage stores custom
+spec fields but does not itself enforce this custom workflow schema. No Git push reconciliation is
+introduced: editing the file alone neither triggers Terraform nor changes the running VM. A future
+update/reconcile workflow is separate work. Legacy inventory is not migrated; rollout starts from an
+empty VM inventory after the requested VM teardown.
 
 Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`
 (`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN` (catalog-only
@@ -56,11 +100,12 @@ IDP is live. The IDP must enable orphan deletion and register the `cf-vms` Locat
 
 ```bash
 gh workflow run provision.yml -R amirasyraf/compute-factory-platform \
-  -f name=demo-1 -f team=alpha -f platform=aws -f os=ubuntu -f size=S \
-  -f software=git,nginx -f ad_join=true -f requested_by=amirasyraf -f requester_teams=alpha
+  -f name=demo-1 \
+  -f 'spec_json={"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"configuration":{"software":["git","nginx"],"adJoin":false}}' \
+  -f requested_by=amirasyraf -f requester_teams=alpha
 
 gh workflow run fry.yml -R amirasyraf/compute-factory-platform \
-  -f name=demo-1 -f stage=software -f software=htop \
+  -f name=demo-1 -f stage=software -f 'software=["htop"]' \
   -f requested_by=amirasyraf -f requester_teams=alpha
 
 gh workflow run destroy.yml -R amirasyraf/compute-factory-platform \
@@ -74,9 +119,9 @@ belong to `compute-factory` / `compute-factory-builder`, not this repository.
 ## Extending the POC
 
 - **Platform:** add `terraform/platforms/<platform>/` with the same variables (`name`, `os`,
-  `size`, `team`, `requested_by`) and outputs (`public_ip`, `ssh_user`, `instance_id`), plus
+  `size`, `team`, `requested_by`, `cloud_tags`) and outputs (`public_ip`, `ssh_user`, `instance_id`), plus
   a platform size map. Only `name` is required, so lifecycle teardown can destroy with just
-  `-var name=<name>`. Add the platform's OIDC authentication, validation and template enum.
+  `-var name=<name>`. Add the platform's OIDC authentication, spec validation and template enum.
 - **OS:** bake its golden image with the matching `cf:os` tag, add the SSH-user map entry,
   Ansible OS-family tasks, software compatibility validation and template enum. Ubuntu maps
   to the catalog's `linux` package IDs. Update the registration SSH-user mapping as needed.
