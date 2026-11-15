@@ -12,9 +12,9 @@ metadata:
     cf/size: S
     cf/team: bravo
     cf/software: ""
-    cf/public-ip: ""
+    cf/public-ip: "3.25.162.196"
     cf/ssh-user: ubuntu
-    cf/instance-id: ""
+    cf/instance-id: "i-0b1c78c2cb6345277"
     cf/requested-by: orchestrator
     cf/run-id: "43684434622"
     cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43684434622
