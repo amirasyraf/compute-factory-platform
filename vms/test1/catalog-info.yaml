@@ -5,9 +5,9 @@ metadata:
   title: test1
   description: ubuntu VM on aws (S) for team teama
   annotations:
-    cf/status: provisioning
-    cf/stages: '{"provision":"running","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"running","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/status: frying
+    cf/stages: '{"provision":"success","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
     cf/public-ip: "16.179.83.203"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-014d311a908271d86"
