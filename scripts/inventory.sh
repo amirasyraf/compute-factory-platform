@@ -19,6 +19,8 @@ case "$action" in
       --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
       '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/run-id":$run,"cf/run-url":$url}},spec:$spec}' \
       | yq -P '.' > "$file"
+    export REQUEST_ID="${REQUEST_ID:-manual:$GITHUB_RUN_ID}"
+    yq -i '.metadata.annotations."cf/request-id" = strenv(REQUEST_ID) | .metadata.annotations."cf/provision-run-id" = strenv(GITHUB_RUN_ID)' "$file"
     ;;
   configure)
     [[ -f "$file" ]] || exit 1
@@ -61,6 +63,9 @@ case "$action" in
       yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
     fi
     if [[ "${STATUS:-}" == ready ]]; then
+      READY_AT="$(date -u +%FT%TZ)"
+      export READY_AT
+      yq -i '.metadata.annotations."cf/ready-at" = (.metadata.annotations."cf/ready-at" // strenv(READY_AT))' "$file"
       processes=$(yq -r '.metadata.annotations."cf/processes" // "{}"' "$file" | jq -c '.finalize="success" | ."on-failure"="skipped"')
       export processes
       yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
@@ -73,6 +78,9 @@ case "$action" in
   failure)
     # Validation/guard failures must not mutate an existing VM.
     [[ -f "$file" ]] || exit 0
+    FAILED_AT="$(date -u +%FT%TZ)"
+    export FAILED_AT
+    yq -i '.metadata.annotations."cf/failed-at" = (.metadata.annotations."cf/failed-at" // strenv(FAILED_AT))' "$file"
     stages=$(yq -r '.metadata.annotations."cf/stages"' "$file" | jq -c 'with_entries(if .value=="running" then .value="failed" else . end)')
     export stages
     yq -i '.metadata.annotations."cf/status" = "failed" | .metadata.annotations."cf/stages" = strenv(stages)' "$file"

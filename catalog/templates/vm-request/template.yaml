@@ -104,20 +104,13 @@ spec:
         size: ${{ parameters.compute.size }}
     - id: dispatch
       name: Start VM pipeline
-      action: github:actions:dispatch
+      action: cf:vm:dispatch
       input:
-        repoUrl: github.com?owner=amirasyraf&repo=compute-factory-platform
-        workflowId: provision.yml
-        branchOrTagName: main
-        returnWorkflowRunDetails: true
-        workflowInputs:
-          name: ${{ parameters.name }}
-          spec_json: >-
-            {"type":"vm","owner":${{ parameters.team | dump }},"lifecycle":"poc",
-            "compute":${{ parameters.compute | dump }},"configuration":${{ parameters.configuration | dump }},
-            "billing":${{ parameters.billing | default({}) | dump }},"cloudTags":${{ parameters.cloudTags | default({}) | dump }}}
-          requested_by: ${{ user.entity.metadata.name }}
-          requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
+        name: ${{ parameters.name }}
+        specJson: >-
+          {"type":"vm","owner":${{ parameters.team | dump }},"lifecycle":"poc",
+          "compute":${{ parameters.compute | dump }},"configuration":${{ parameters.configuration | dump }},
+          "billing":${{ parameters.billing | default({}) | dump }},"cloudTags":${{ parameters.cloudTags | default({}) | dump }}}
     - id: monitor
       name: Monitor VM workflow
       action: cf:watch-workflow

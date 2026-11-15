@@ -34,6 +34,7 @@ if NAME=../../escape bash scripts/validate.sh provision; then echo 'Invalid name
 bash scripts/inventory.sh register
 test -f vms/.gitkeep
 test ! -f "vms/$NAME/request.yaml"
+yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/request-id"]=="manual:123" and .metadata.annotations["cf/provision-run-id"]=="123"'
 yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.spec.owner=="group:default/alpha" and .spec.configuration.software==[] and .spec.configuration.adJoin==false and .metadata.annotations["cf/requested-by"]=="tester" and (.metadata.annotations|has("cf/software")|not)'
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["provision","baseline","software","ad-join","access"]'
 yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["validate","register","provision","fry-baseline","fry-software","fry-ad-join","fry-access","finalize","on-failure"]'
@@ -103,15 +104,26 @@ SPEC_JSON="$configured" bash scripts/inventory.sh configure
 yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -e '.configuration.adJoin==true and .configuration.software==["htop"]'
 before=$(yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -c .)
 STATUS=ready STAGE=baseline STAGE_STATUS=success bash scripts/inventory.sh update
+ready_at=$(yq -r '.metadata.annotations."cf/ready-at"' "vms/$NAME/catalog-info.yaml")
+[[ "$ready_at" =~ ^[0-9]{4}- ]]
 STATUS=ready STAGE=software bash scripts/inventory.sh update
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.software=="skipped" and .baseline=="success"'
 yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.finalize=="success" and ."on-failure"=="skipped"'
 GITHUB_RUN_ID=456 STAGE=software STAGE_STATUS=success bash scripts/inventory.sh update
+[[ "$(yq -r '.metadata.annotations."cf/ready-at"' "vms/$NAME/catalog-info.yaml")" == "$ready_at" ]]
+yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/provision-run-id"]=="123" and (.metadata.annotations["cf/failed-at"]|length)>0'
+# Real guard script: manual allowed, stale incarnation skipped without network access.
+bash scripts/demo-guard.sh
+tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=true'
+DEMO_GENERATION=stale EXPECTED_REQUEST_ID=different bash scripts/demo-guard.sh
+tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=false'
 yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/run-id"]=="456"'
 after=$(yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -c .)
 [[ "$before" == "$after" ]] || { echo 'Status update mutated desired configuration' >&2; exit 1; }
 bash scripts/inventory.sh delete
 test ! -d "vms/$NAME"
+DEMO_GENERATION=stale EXPECTED_REQUEST_ID=manual:123 bash scripts/demo-guard.sh
+tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=false'
 test -f vms/.gitkeep
 test -f vms/other-vm/catalog-info.yaml
 echo 'Offline workflow-helper integration tests passed'

@@ -1,5 +1,5 @@
 name: destroy
-run-name: "destroy ${{ inputs.name }} by ${{ inputs.requested_by }}"
+run-name: "destroy ${{ inputs.name }} by ${{ inputs.requested_by }} [${{ inputs.demo_generation }}:${{ inputs.expected_request_id }}]"
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +12,14 @@ on:
       requester_teams:
         type: string
         required: true
+      demo_generation:
+        description: Automatic cleanup mode generation; omitted for manual destroy
+        type: string
+        required: false
+      expected_request_id:
+        description: VM incarnation identity for automatic cleanup
+        type: string
+        required: false
 concurrency:
   group: vm-${{ inputs.name }}
   cancel-in-progress: false
@@ -26,19 +34,26 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
   BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
+  DEMO_GENERATION: ${{ inputs.demo_generation }}
+  EXPECTED_REQUEST_ID: ${{ inputs.expected_request_id }}
 jobs:
   guard:
     runs-on: ubuntu-latest
     outputs:
       platform: ${{ steps.validate.outputs.platform }}
+      proceed: ${{ steps.demo.outputs.proceed }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
+      - id: demo
+        run: bash scripts/demo-guard.sh
       - id: validate
+        if: steps.demo.outputs.proceed == 'true'
         run: bash scripts/validate.sh existing
   destroy:
     needs: guard
+    if: needs.guard.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -47,9 +62,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - run: bash scripts/inventory.sh update
-        env:
-          STATUS: destroying
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -58,6 +70,13 @@ jobs:
         with:
           terraform_version: 1.16.4
           terraform_wrapper: false
-      - run: bash scripts/terraform.sh destroy
-      - if: failure()
+      - id: demo
+        run: bash scripts/demo-guard.sh
+      - if: steps.demo.outputs.proceed == 'true'
+        run: bash scripts/inventory.sh update
+        env:
+          STATUS: destroying
+      - if: steps.demo.outputs.proceed == 'true'
+        run: bash scripts/terraform.sh destroy
+      - if: failure() && steps.demo.outputs.proceed == 'true'
         run: bash scripts/inventory.sh failure

@@ -1,5 +1,5 @@
 name: provision
-run-name: "provision ${{ inputs.name }} by ${{ inputs.requested_by }}"
+run-name: "provision ${{ inputs.name }} by ${{ inputs.requested_by }} [${{ inputs.request_id }}]"
 on:
   workflow_dispatch:
     inputs:
@@ -16,6 +16,10 @@ on:
       requester_teams:
         type: string
         required: true
+      request_id:
+        description: Stable IDP request identity (optional for trusted manual dispatch)
+        type: string
+        required: false
 concurrency:
   group: vm-${{ inputs.name }}
   cancel-in-progress: false
@@ -27,6 +31,7 @@ env:
   SPEC_JSON: ${{ inputs.spec_json }}
   REQUESTED_BY: ${{ inputs.requested_by }}
   REQUESTER_TEAMS: ${{ inputs.requester_teams }}
+  REQUEST_ID: ${{ inputs.request_id }}
   BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
   BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
   TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}

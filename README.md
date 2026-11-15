@@ -37,7 +37,8 @@ a real ServiceNow ticket or approval gate. Failure stops dispatch; the number ap
 and successful task output only, not VM inventory or GHA inputs. Refry/destroy and direct workflow
 dispatch are unchanged. The matching backend action must be available before using this template.
 
-The request template dispatches `name`, `spec_json`, `requested_by` and `requester_teams`.
+The request template uses `cf:vm:dispatch` to reserve quota in the IDP before dispatching
+`name`, `spec_json`, `requested_by`, `requester_teams` and the stable `request_id` (task ID).
 `spec_json` is a JSON Resource spec; identity/group claims remain server-supplied authorization
 context, not user-editable desired state. Validation normalizes the owner to `group:default/<team>`
 and commits the spec in `vms/<name>/catalog-info.yaml`. There is no separate `request.yaml`, and no
@@ -78,8 +79,9 @@ update/reconcile workflow is separate work. Legacy inventory is not migrated; ro
 empty VM inventory after the requested VM teardown.
 
 Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`
-(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN` (catalog-only
-external access). Missing Backstage configuration skips refresh without affecting provisioning.
+(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN` (catalog plus the
+read-only demo cleanup check; subject `compute-factory-workflows`). Missing Backstage configuration
+skips catalog refresh without affecting provisioning; automatic demo destruction fails closed.
 AWS access always uses OIDC, never static keys. Terraform uses partial S3 backend configuration
 and native lockfiles, with state `vms/aws/<name>/terraform.tfstate`.
 Provider checksums cover macOS arm64 and Linux amd64; workflow init uses
@@ -104,6 +106,23 @@ filtering, checkbox rendering, boolean-to-string serialization and catalog disco
 IDP is live. The IDP must enable orphan deletion and register the `cf-vms` Location glob.
 
 ## Manual dispatch
+
+### Automatic demo cleanup
+
+The IDP's admin-toggleable demo policy is defined in `compute-factory/CONTRACTS.md` §8.1.
+Registration records immutable `cf/request-id` and `cf/provision-run-id`; `cf/ready-at` and
+`cf/failed-at` record first readiness/failure and are not reset by refry. Manual provision defaults
+the request ID to `manual:<run-id>`. Old inventory without these annotations is handled conservatively
+by the controller using its original request timestamp/first observed readiness.
+
+Automatic `destroy.yml` dispatch includes `demo_generation` and `expected_request_id`. The real
+guard script checks both VM incarnation and current backend eligibility twice, skipping stale/missing
+VMs and refusing deletion on network/auth failures. The second check immediately precedes destructive
+inventory/Terraform work, after tool setup. Manual destroy omits these fields and remains unchanged.
+Workflows remain serialized per VM. The IDP must be reachable for automatic cleanup; runner queues
+and Terraform mean expiry is a trigger time, not a guaranteed completed termination time.
+
+### Trusted operator dispatch
 
 ```bash
 gh workflow run provision.yml -R amirasyraf/compute-factory-platform \
