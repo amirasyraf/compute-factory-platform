@@ -27,7 +27,8 @@ if [[ "$action" == apply ]]; then
   PUBLIC_IP=$(terraform -chdir="$dir" output -raw public_ip)
   SSH_USER=$(terraform -chdir="$dir" output -raw ssh_user)
   INSTANCE_ID=$(terraform -chdir="$dir" output -raw instance_id)
-  export PUBLIC_IP SSH_USER INSTANCE_ID
+  INSTANCE_TYPE=$(terraform -chdir="$dir" output -raw instance_type)
+  export PUBLIC_IP SSH_USER INSTANCE_ID INSTANCE_TYPE
   bash scripts/inventory.sh outputs
   STATUS=frying STAGE=provision STAGE_STATUS=success bash scripts/inventory.sh update
   if [[ "$SOFTWARE" == '[]' ]]; then

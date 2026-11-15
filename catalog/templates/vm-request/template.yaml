@@ -44,6 +44,8 @@ spec:
               type: string
               default: S
               enum: [S, M, L]
+              # IDP field: shows each size's instance type and live AWS specs.
+              ui:field: VmSizePicker
         configuration:
           title: Configuration
           type: object

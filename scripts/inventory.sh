@@ -17,7 +17,7 @@ case "$action" in
       --arg size "$SIZE" --arg user "$REQUESTED_BY" --arg run "$GITHUB_RUN_ID" \
       --arg requested_at "$(date -u +%FT%TZ)" --argjson spec "$SPEC_JSON" \
       --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/run-id":$run,"cf/run-url":$url}},spec:$spec}' \
+      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/instance-type":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/run-id":$run,"cf/run-url":$url}},spec:$spec}' \
       | yq -P '.' > "$file"
     export REQUEST_ID="${REQUEST_ID:-manual:$GITHUB_RUN_ID}"
     yq -i '.metadata.annotations."cf/request-id" = strenv(REQUEST_ID) | .metadata.annotations."cf/provision-run-id" = strenv(GITHUB_RUN_ID)' "$file"
@@ -72,8 +72,8 @@ case "$action" in
     fi
     ;;
   outputs)
-    export PUBLIC_IP SSH_USER INSTANCE_ID
-    yq -i '.metadata.annotations."cf/public-ip" = strenv(PUBLIC_IP) | .metadata.annotations."cf/ssh-user" = strenv(SSH_USER) | .metadata.annotations."cf/instance-id" = strenv(INSTANCE_ID)' "$file"
+    export PUBLIC_IP SSH_USER INSTANCE_ID INSTANCE_TYPE
+    yq -i '.metadata.annotations."cf/public-ip" = strenv(PUBLIC_IP) | .metadata.annotations."cf/ssh-user" = strenv(SSH_USER) | .metadata.annotations."cf/instance-id" = strenv(INSTANCE_ID) | .metadata.annotations."cf/instance-type" = strenv(INSTANCE_TYPE)' "$file"
     ;;
   failure)
     # Validation/guard failures must not mutate an existing VM.

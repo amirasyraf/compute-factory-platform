@@ -145,8 +145,10 @@ belong to `compute-factory` / `compute-factory-builder`, not this repository.
 ## Extending the POC
 
 - **Platform:** add `terraform/platforms/<platform>/` with the same variables (`name`, `os`,
-  `size`, `team`, `requested_by`, `cloud_tags`) and outputs (`public_ip`, `ssh_user`, `instance_id`), plus
-  a platform size map. Only `name` is required, so lifecycle teardown can destroy with just
+  `size`, `team`, `requested_by`, `cloud_tags`) and outputs (`public_ip`, `ssh_user`, `instance_id`,
+  `instance_type`), plus a platform size map. For AWS the map is `terraform/platforms/aws/sizes.json`
+  (`S`/`M`/`L` to instance type), read by Terraform and by the IDP request form; provisioning records the
+  launched type in the `cf/instance-type` annotation. Only `name` is required, so lifecycle teardown can destroy with just
   `-var name=<name>`. Add the platform's OIDC authentication, spec validation and template enum.
 - **OS:** bake its golden image with the matching `cf:os` tag, add the SSH-user map entry,
   Ansible OS-family tasks, software compatibility validation and template enum. Ubuntu maps

@@ -70,6 +70,7 @@ terraform() {
         public_ip) printf 192.0.2.10 ;;
         ssh_user) printf ubuntu ;;
         instance_id) printf i-test ;;
+        instance_type) printf t3.small ;;
         *) return 1 ;;
       esac
       ;;
@@ -85,6 +86,7 @@ yq -i '.spec.compute.size = "M"' "vms/$NAME/catalog-info.yaml"
 SIZE=L TEAM=bravo SOFTWARE=nginx AD_JOIN=true bash scripts/terraform.sh apply
 jq -e '.size=="M" and .team=="alpha" and .requested_by=="tester" and .cloud_tags=={"environment":"test","billing:cost-center":"CC-123","billing:project-code":"P-1"}' "$CAPTURED_VARS"
 unset -f terraform
+yq -o=json '.metadata.annotations' "vms/$NAME/catalog-info.yaml" | jq -e '.["cf/instance-id"]=="i-test" and .["cf/instance-type"]=="t3.small"'
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.["software"]=="skipped" and .["ad-join"]=="skipped"'
 yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.["fry-software"]=="skipped" and .["fry-ad-join"]=="skipped"'
 test -f vms/other-vm/catalog-info.yaml
