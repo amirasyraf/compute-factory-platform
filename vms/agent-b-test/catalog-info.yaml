@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: agent-b-test
+  title: agent-b-test
+  description: ubuntu VM on aws (S) for team alpha
+  annotations:
+    cf/status: provisioning
+    cf/stages: '{"provision":"running","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/platform: aws
+    cf/os: ubuntu
+    cf/size: S
+    cf/team: alpha
+    cf/software: git,nginx
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/requested-by: amirasyraf
+    cf/run-id: "43657561105"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43657561105
+spec:
+  type: vm
+  owner: group:default/alpha
+  lifecycle: poc
