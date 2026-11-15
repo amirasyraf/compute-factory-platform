@@ -12,9 +12,9 @@ metadata:
     cf/size: S
     cf/team: alpha
     cf/software: git,nginx
-    cf/public-ip: ""
+    cf/public-ip: "3.25.163.199"
     cf/ssh-user: ubuntu
-    cf/instance-id: ""
+    cf/instance-id: "i-019737c442c4659b6"
     cf/requested-by: amirasyraf
     cf/run-id: "43657561105"
     cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43657561105
