@@ -5,8 +5,8 @@ metadata:
   title: agent-b-test
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: ready
-    cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
+    cf/status: frying
+    cf/stages: '{"provision":"success","baseline":"success","software":"running","ad-join":"success","access":"success"}'
     cf/platform: aws
     cf/os: ubuntu
     cf/size: S
@@ -16,8 +16,8 @@ metadata:
     cf/ssh-user: ubuntu
     cf/instance-id: "i-019737c442c4659b6"
     cf/requested-by: amirasyraf
-    cf/run-id: "43657561105"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43657561105
+    cf/run-id: "43682164750"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43682164750
 spec:
   type: vm
   owner: group:default/alpha
