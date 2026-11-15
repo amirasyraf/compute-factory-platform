@@ -1,0 +1,34 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: test1
+  title: test1
+  description: ubuntu VM on aws (S) for team teama
+  annotations:
+    cf/status: provisioning
+    cf/stages: '{"provision":"pending","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/requested-by: user1
+    cf/requested-at: "2026-11-15T22:14:21Z"
+    cf/run-id: "43768145884"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43768145884
+    cf/request-id: 3dc622fe-b9da-4827-9a84-ce1353d02f1a
+    cf/provision-run-id: "43768145884"
+spec:
+  type: vm
+  owner: group:default/teama
+  lifecycle: poc
+  compute:
+    platform: aws
+    os: ubuntu
+    size: S
+  configuration:
+    software:
+      - docker
+      - nginx
+    adJoin: false
+  billing: {}
+  cloudTags: {}
