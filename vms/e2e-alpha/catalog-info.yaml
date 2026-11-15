@@ -5,7 +5,7 @@ metadata:
   title: e2e-alpha
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/platform: aws
     cf/os: ubuntu
