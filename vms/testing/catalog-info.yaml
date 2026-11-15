@@ -13,9 +13,9 @@ metadata:
     cf/size: S
     cf/team: alpha
     cf/software: nginx,docker
-    cf/public-ip: ""
+    cf/public-ip: "3.25.220.146"
     cf/ssh-user: ubuntu
-    cf/instance-id: ""
+    cf/instance-id: "i-08e7b305bd16ea2c9"
     cf/requested-by: amirasyraf
     cf/run-id: "43697017764"
     cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43697017764
