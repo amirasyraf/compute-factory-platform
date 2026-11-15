@@ -80,6 +80,8 @@ yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations as $
 SOFTWARE=htop STAGE=software bash scripts/validate.sh existing
 grep -q '^host=192.0.2.10$' "$GITHUB_OUTPUT"
 STATUS=ready STAGE=baseline STAGE_STATUS=success bash scripts/inventory.sh update
+STATUS=ready STAGE=software bash scripts/inventory.sh update
+yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.software=="skipped" and .baseline=="success"'
 GITHUB_RUN_ID=456 STAGE=software STAGE_STATUS=success bash scripts/inventory.sh update
 yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/run-id"]=="456"'
 yq -o=json '.' "vms/$NAME/request.yaml" | jq -e '.software==["git","nginx"] and .run_id=="123"'

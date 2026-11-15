@@ -26,8 +26,9 @@ case "$action" in
       export STATUS
       yq -i '.metadata.annotations."cf/status" = strenv(STATUS)' "$file"
     fi
-    if [[ -n "${STAGE:-}" ]]; then
-      [[ "$STAGE" =~ ^(provision|baseline|software|ad-join|access)$ ]] || exit 1
+    # A dispatch's STAGE can be inherited by a status-only finalizer.
+    if [[ -n "${STAGE_STATUS:-}" ]]; then
+      [[ "${STAGE:-}" =~ ^(provision|baseline|software|ad-join|access)$ ]] || exit 1
       [[ "$STAGE_STATUS" =~ ^(pending|running|success|failed|skipped)$ ]] || exit 1
       export STAGE STAGE_STATUS
       stages=$(yq -r '.metadata.annotations."cf/stages"' "$file" | jq -c --arg stage "$STAGE" --arg status "$STAGE_STATUS" '.[$stage]=$status')
