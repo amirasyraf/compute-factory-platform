@@ -5,7 +5,7 @@ metadata:
   title: test
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "52.64.19.171"
@@ -13,8 +13,8 @@ metadata:
     cf/instance-id: "i-0d00568d53ed10ba8"
     cf/requested-by: amirasyraf
     cf/requested-at: "2026-11-15T10:37:12Z"
-    cf/run-id: "43704938582"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43704938582
+    cf/run-id: "43713675873"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43713675873
 spec:
   type: vm
   owner: group:default/alpha
