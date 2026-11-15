@@ -16,7 +16,8 @@ then removes `vms/<name>/`. The VM catalog entity is subsequently orphaned and d
 
 All three entry points share concurrency group `vm-<name>`, so operations on the same VM
 are serialized. Distinct VMs can run concurrently. Inventory commits retry pull/rebase/push
-five times. Backstage refresh is best-effort and bounded to ten seconds per entity.
+five times, using rebase autostash to preserve unrelated working-tree changes. Backstage refresh
+is best-effort and bounded to ten seconds per entity.
 `vms/.gitkeep` is permanent; each registered VM has `request.yaml` and `catalog-info.yaml`.
 
 ## Configuration and trust
@@ -26,6 +27,8 @@ Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE
 external access). Missing Backstage configuration skips refresh without affecting provisioning.
 AWS access always uses OIDC, never static keys. Terraform uses partial S3 backend configuration
 and native lockfiles, with state `vms/aws/<name>/terraform.tfstate`.
+Provider checksums cover macOS arm64 and Linux amd64; workflow init uses
+`-lockfile=readonly` so initialization cannot dirty tracked files before inventory rebasing.
 
 Requirements: default VPC/subnets, golden AMI tagged `cf:managed=true` and `cf:os=ubuntu`,
 and Secrets Manager `compute-factory/ssh-ca`. All created resources are tagged `cf:poc=true`.

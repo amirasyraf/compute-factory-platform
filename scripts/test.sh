@@ -46,9 +46,34 @@ touch "$tmp/other/vms/other-vm/catalog-info.yaml"
 git -C "$tmp/other" add .
 git -C "$tmp/other" commit -m 'another VM' >/dev/null
 git -C "$tmp/other" push >/dev/null
-PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-test bash scripts/inventory.sh outputs
+# Inventory rebasing must preserve, rather than depend on, unrelated dirty files.
+printf '# unrelated local edit\n' >> ansible/software-catalog.yml
+# Mock only the Terraform boundary, leaving real inventory/Git operations in place.
+# A runner must not modify tracked lockfiles before the inventory rebase.
+# Exported for the child shell running scripts/terraform.sh.
+# shellcheck disable=SC2329
+terraform() {
+  case "$2" in
+    init) [[ " $* " == *" -lockfile=readonly "* ]] ;;
+    apply) return 0 ;;
+    output)
+      case "$4" in
+        public_ip) printf 192.0.2.10 ;;
+        ssh_user) printf ubuntu ;;
+        instance_id) printf i-test ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *) return 1 ;;
+  esac
+}
+export -f terraform
+export AWS_REGION=ap-southeast-2 TF_STATE_BUCKET=test-bucket
+SOFTWARE='' AD_JOIN=false bash scripts/terraform.sh apply
+unset -f terraform
+yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.["software"]=="skipped" and .["ad-join"]=="skipped"'
 test -f vms/other-vm/catalog-info.yaml
-STATUS=frying STAGE=provision STAGE_STATUS=success bash scripts/inventory.sh update
+grep -q '# unrelated local edit' ansible/software-catalog.yml
 STAGE=baseline STAGE_STATUS=running bash scripts/inventory.sh update
 bash scripts/inventory.sh failure
 yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations as $a | $a["cf/status"]=="failed" and ($a["cf/stages"]|fromjson|.baseline)=="failed"'

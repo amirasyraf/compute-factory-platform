@@ -5,7 +5,10 @@ action=${1:?apply or destroy}
 [[ "${NAME:?}" =~ ^[a-z][a-z0-9-]{2,20}$ && "${PLATFORM:?}" == aws ]] || exit 1
 dir="terraform/platforms/$PLATFORM"
 key="vms/$PLATFORM/$NAME/terraform.tfstate"
-terraform -chdir="$dir" init -input=false \
+if [[ "$action" == apply ]]; then
+  STATUS=provisioning STAGE=provision STAGE_STATUS=running bash scripts/inventory.sh update
+fi
+terraform -chdir="$dir" init -input=false -lockfile=readonly \
   -backend-config="bucket=${TF_STATE_BUCKET:?}" -backend-config="key=$key" \
   -backend-config="region=${AWS_REGION:?}" -backend-config=use_lockfile=true
 if [[ "$action" == apply ]]; then

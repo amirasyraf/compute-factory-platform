@@ -66,7 +66,7 @@ if ! git diff --cached --quiet; then
 fi
 pushed=false
 for attempt in 1 2 3 4 5; do
-  if git pull --rebase origin main && git push origin HEAD:main; then
+  if git pull --rebase --autostash origin main && git push origin HEAD:main; then
     pushed=true
     break
   fi
