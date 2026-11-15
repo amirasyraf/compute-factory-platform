@@ -1,0 +1,10 @@
+name: iso-bravo
+team: bravo
+platform: aws
+os: ubuntu
+size: S
+software: []
+ad_join: false
+requested_by: orchestrator
+requested_at: "2026-11-15T06:13:33Z"
+run_id: "43684434622"
