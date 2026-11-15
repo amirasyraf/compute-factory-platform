@@ -6,6 +6,9 @@ metadata:
   description: Destroy a VM and remove its inventory and catalog entity.
 spec:
   owner: group:default/platform-admins
+  presentation:
+    buttonLabels:
+      createButtonText: Destroy VM
   type: infrastructure
   parameters:
     - title: Select a VM to destroy

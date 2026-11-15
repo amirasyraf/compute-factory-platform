@@ -6,6 +6,9 @@ metadata:
   description: Apply one configuration stage to an existing team VM.
 spec:
   owner: group:default/platform-admins
+  presentation:
+    buttonLabels:
+      createButtonText: Refry VM
   type: infrastructure
   parameters:
     - title: VM and stage

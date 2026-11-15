@@ -6,6 +6,9 @@ metadata:
   description: Provision a team-owned VM and apply the selected fry stages.
 spec:
   owner: group:default/platform-admins
+  presentation:
+    buttonLabels:
+      createButtonText: Request VM
   type: infrastructure
   parameters:
     - title: VM request
