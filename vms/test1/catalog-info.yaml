@@ -6,8 +6,8 @@ metadata:
   description: ubuntu VM on aws (S) for team teama
   annotations:
     cf/status: frying
-    cf/stages: '{"provision":"success","baseline":"success","software":"pending","ad-join":"pending","access":"pending"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/stages: '{"provision":"success","baseline":"success","software":"running","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"running","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
     cf/public-ip: "16.179.141.243"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0f9b103c47b3ffe28"
