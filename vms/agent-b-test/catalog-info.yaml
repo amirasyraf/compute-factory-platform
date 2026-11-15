@@ -5,7 +5,7 @@ metadata:
   title: agent-b-test
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: failed
+    cf/status: destroying
     cf/stages: '{"provision":"failed","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
     cf/platform: aws
     cf/os: ubuntu
@@ -16,8 +16,8 @@ metadata:
     cf/ssh-user: ubuntu
     cf/instance-id: ""
     cf/requested-by: amirasyraf
-    cf/run-id: "43656831479"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43656831479
+    cf/run-id: "43657419663"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43657419663
 spec:
   type: vm
   owner: group:default/alpha
