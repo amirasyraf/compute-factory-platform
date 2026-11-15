@@ -5,7 +5,7 @@ metadata:
   title: dx-fe3e9f-2
   description: ubuntu VM on aws (S) for team teamb
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"skipped","ad-join":"skipped","access":"success"}'
     cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"skipped","fry-ad-join":"skipped","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "16.179.92.148"
@@ -13,8 +13,8 @@ metadata:
     cf/instance-id: "i-062a6fd02f9d2abbe"
     cf/requested-by: user4
     cf/requested-at: "2026-11-15T21:30:36Z"
-    cf/run-id: "43764045601"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43764045601
+    cf/run-id: "43765098318"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43765098318
     cf/request-id: 3f82482eca71469293c7b23449c74d1f
     cf/provision-run-id: "43764045601"
     cf/ready-at: "2026-11-15T21:34:34Z"
