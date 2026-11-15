@@ -5,7 +5,7 @@ metadata:
   title: testing
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/platform: aws
@@ -17,8 +17,8 @@ metadata:
     cf/ssh-user: ubuntu
     cf/instance-id: "i-08e7b305bd16ea2c9"
     cf/requested-by: amirasyraf
-    cf/run-id: "43697017764"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43697017764
+    cf/run-id: "43699035762"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43699035762
 spec:
   type: vm
   owner: group:default/alpha
