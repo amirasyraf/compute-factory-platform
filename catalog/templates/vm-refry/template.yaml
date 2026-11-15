@@ -1,0 +1,63 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: vm-refry
+  title: Re-run a fry stage
+  description: Apply one configuration stage to an existing team VM.
+spec:
+  owner: group:default/platform-admins
+  type: infrastructure
+  parameters:
+    - title: VM and stage
+      required: [vm, stage]
+      properties:
+        vm:
+          title: VM
+          type: string
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Resource
+              spec.type: vm
+            defaultKind: Resource
+            allowArbitraryValues: false
+        stage:
+          title: Fry stage
+          type: string
+          enum: [baseline, software, ad-join, access]
+          default: software
+        software:
+          title: Software (only used for software stage)
+          type: array
+          default: []
+          uniqueItems: true
+          items:
+            type: string
+            enum: [git, htop, nginx, docker]
+          ui:widget: checkboxes
+  steps:
+    - id: vm
+      name: Authorize VM lookup as initiating user
+      action: catalog:fetch
+      input:
+        entityRef: ${{ parameters.vm }}
+    - id: dispatch
+      name: Start fry pipeline
+      action: github:actions:dispatch
+      input:
+        repoUrl: github.com?owner=amirasyraf&repo=compute-factory-platform
+        workflowId: fry.yml
+        branchOrTagName: main
+        returnWorkflowRunDetails: true
+        workflowInputs:
+          name: ${{ steps.vm.output.entity.metadata.name }}
+          stage: ${{ parameters.stage }}
+          software: ${{ parameters.software | join(',') }}
+          requested_by: ${{ user.entity.metadata.name }}
+          requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
+  output:
+    links:
+      - title: Open VM in catalog
+        entityRef: ${{ parameters.vm }}
+      - title: Pipeline run
+        url: ${{ steps.dispatch.output.workflowRunHtmlUrl }}

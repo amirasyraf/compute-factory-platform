@@ -1,0 +1,10 @@
+locals {
+  sizes = {
+    S = "t3.small"
+    M = "t3.medium"
+    L = "t3.large"
+  }
+  ssh_users = {
+    ubuntu = "ubuntu"
+  }
+}

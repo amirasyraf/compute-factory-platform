@@ -1,0 +1,63 @@
+name: destroy
+run-name: "destroy ${{ inputs.name }} by ${{ inputs.requested_by }}"
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        type: string
+        required: true
+      requested_by:
+        type: string
+        required: true
+      requester_teams:
+        type: string
+        required: true
+concurrency:
+  group: vm-${{ inputs.name }}
+  cancel-in-progress: false
+permissions:
+  contents: write
+  id-token: write
+env:
+  NAME: ${{ inputs.name }}
+  REQUESTED_BY: ${{ inputs.requested_by }}
+  REQUESTER_TEAMS: ${{ inputs.requester_teams }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
+  BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      platform: ${{ steps.validate.outputs.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: validate
+        run: bash scripts/validate.sh existing
+  destroy:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLATFORM: ${{ needs.guard.outputs.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: bash scripts/inventory.sh update
+        env:
+          STATUS: destroying
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+          terraform_wrapper: false
+      - run: bash scripts/terraform.sh destroy
+      - if: failure()
+        run: bash scripts/inventory.sh failure

@@ -1,0 +1,75 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: vm-request
+  title: Request a VM
+  description: Provision a team-owned VM and apply the selected fry stages.
+spec:
+  owner: group:default/platform-admins
+  type: infrastructure
+  parameters:
+    - title: VM request
+      required: [name, team, platform, os, size, ad_join]
+      properties:
+        name:
+          title: VM name
+          type: string
+          pattern: '^[a-z][a-z0-9-]{2,20}$'
+          description: Unique lowercase name, 3–21 characters.
+        team:
+          title: Owning team
+          type: string
+          ui:field: MyGroupsPicker
+        platform:
+          title: Platform
+          type: string
+          default: aws
+          enum: [aws]
+        os:
+          title: Operating system
+          type: string
+          default: ubuntu
+          enum: [ubuntu]
+        size:
+          title: Size
+          type: string
+          default: S
+          enum: [S, M, L]
+        software:
+          title: Software
+          type: array
+          default: []
+          uniqueItems: true
+          items:
+            type: string
+            enum: [git, htop, nginx, docker]
+          ui:widget: checkboxes
+        ad_join:
+          title: Join AD (mock)
+          type: boolean
+          default: false
+  steps:
+    - id: dispatch
+      name: Start VM pipeline
+      action: github:actions:dispatch
+      input:
+        repoUrl: github.com?owner=amirasyraf&repo=compute-factory-platform
+        workflowId: provision.yml
+        branchOrTagName: main
+        returnWorkflowRunDetails: true
+        workflowInputs:
+          name: ${{ parameters.name }}
+          team: ${{ parameters.team }}
+          platform: ${{ parameters.platform }}
+          os: ${{ parameters.os }}
+          size: ${{ parameters.size }}
+          software: ${{ parameters.software | join(',') }}
+          ad_join: ${{ parameters.ad_join | dump }}
+          requested_by: ${{ user.entity.metadata.name }}
+          requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
+  output:
+    links:
+      - title: Open VM in catalog
+        entityRef: resource:default/${{ parameters.name }}
+      - title: Pipeline run
+        url: ${{ steps.dispatch.output.workflowRunHtmlUrl }}

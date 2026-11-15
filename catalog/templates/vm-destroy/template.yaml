@@ -1,0 +1,47 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: vm-destroy
+  title: Destroy a VM
+  description: Destroy a VM and remove its inventory and catalog entity.
+spec:
+  owner: group:default/platform-admins
+  type: infrastructure
+  parameters:
+    - title: Select a VM to destroy
+      required: [vm]
+      properties:
+        vm:
+          title: VM
+          type: string
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Resource
+              spec.type: vm
+            defaultKind: Resource
+            allowArbitraryValues: false
+  steps:
+    - id: vm
+      name: Authorize VM lookup as initiating user
+      action: catalog:fetch
+      input:
+        entityRef: ${{ parameters.vm }}
+    - id: dispatch
+      name: Start destroy pipeline
+      action: github:actions:dispatch
+      input:
+        repoUrl: github.com?owner=amirasyraf&repo=compute-factory-platform
+        workflowId: destroy.yml
+        branchOrTagName: main
+        returnWorkflowRunDetails: true
+        workflowInputs:
+          name: ${{ steps.vm.output.entity.metadata.name }}
+          requested_by: ${{ user.entity.metadata.name }}
+          requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
+  output:
+    links:
+      - title: VM (removed after destroy)
+        entityRef: ${{ parameters.vm }}
+      - title: Pipeline run
+        url: ${{ steps.dispatch.output.workflowRunHtmlUrl }}
