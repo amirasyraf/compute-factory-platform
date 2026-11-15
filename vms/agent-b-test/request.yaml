@@ -1,0 +1,12 @@
+name: agent-b-test
+team: alpha
+platform: aws
+os: ubuntu
+size: S
+software:
+  - git
+  - nginx
+ad_join: true
+requested_by: amirasyraf
+requested_at: "2026-11-15T00:10:30Z"
+run_id: "43656831479"
