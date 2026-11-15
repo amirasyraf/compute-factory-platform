@@ -5,9 +5,9 @@ metadata:
   title: testing
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"pending","on-failure":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/platform: aws
     cf/os: ubuntu
     cf/size: S
