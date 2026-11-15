@@ -6,7 +6,7 @@ metadata:
   description: ubuntu VM on aws (S) for team alpha
   annotations:
     cf/status: frying
-    cf/stages: '{"provision":"success","baseline":"success","software":"running","ad-join":"pending","access":"pending"}'
+    cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"pending","access":"pending"}'
     cf/platform: aws
     cf/os: ubuntu
     cf/size: S
