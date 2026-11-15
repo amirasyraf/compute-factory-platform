@@ -35,6 +35,7 @@ bash scripts/inventory.sh register
 test -f vms/.gitkeep
 yq -o=json '.' "vms/$NAME/request.yaml" | jq -e '.team=="alpha" and .software==["git","nginx"] and .ad_join==true and .run_id=="123"'
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["provision","baseline","software","ad-join","access"]'
+yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["validate","register","provision","fry-baseline","fry-software","fry-ad-join","fry-access","finalize","on-failure"]'
 if bash scripts/validate.sh provision; then echo 'Duplicate VM allowed' >&2; exit 1; fi
 
 # Simulate an unrelated VM commit after this runner's checkout, exercising pull/rebase.
@@ -72,16 +73,18 @@ export AWS_REGION=ap-southeast-2 TF_STATE_BUCKET=test-bucket
 SOFTWARE='' AD_JOIN=false bash scripts/terraform.sh apply
 unset -f terraform
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.["software"]=="skipped" and .["ad-join"]=="skipped"'
+yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.["fry-software"]=="skipped" and .["fry-ad-join"]=="skipped"'
 test -f vms/other-vm/catalog-info.yaml
 grep -q '# unrelated local edit' ansible/software-catalog.yml
 STAGE=baseline STAGE_STATUS=running bash scripts/inventory.sh update
 bash scripts/inventory.sh failure
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations as $a | $a["cf/status"]=="failed" and ($a["cf/stages"]|fromjson|.baseline)=="failed"'
+yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations as $a | $a["cf/status"]=="failed" and ($a["cf/stages"]|fromjson|.baseline)=="failed" and ($a["cf/processes"]|fromjson|."fry-baseline")=="failed" and ($a["cf/processes"]|fromjson|."on-failure")=="success"'
 SOFTWARE=htop STAGE=software bash scripts/validate.sh existing
 grep -q '^host=192.0.2.10$' "$GITHUB_OUTPUT"
 STATUS=ready STAGE=baseline STAGE_STATUS=success bash scripts/inventory.sh update
 STATUS=ready STAGE=software bash scripts/inventory.sh update
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.software=="skipped" and .baseline=="success"'
+yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.finalize=="success" and ."on-failure"=="skipped"'
 GITHUB_RUN_ID=456 STAGE=software STAGE_STATUS=success bash scripts/inventory.sh update
 yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/run-id"]=="456"'
 yq -o=json '.' "vms/$NAME/request.yaml" | jq -e '.software==["git","nginx"] and .run_id=="123"'

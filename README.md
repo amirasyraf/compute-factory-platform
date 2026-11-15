@@ -6,8 +6,9 @@ The binding cross-repository interfaces are in the sibling `compute-factory/CONT
 ## Lifecycle
 
 `provision.yml`: validate → register → Terraform → baseline → optional software → optional
-mock AD join → access → ready. Every inventory transition is committed to `main`; running
-stages are marked failed if a job fails. Failed VMs remain available for diagnosis.
+mock AD join → access → ready. Every inventory transition is committed to `main`; the catalog entity
+records both the five user-facing `cf/stages` and the complete nine-job `cf/processes` graph. Running
+processes are marked failed if a job fails. Failed VMs remain available for diagnosis.
 
 `fry.yml` re-runs one fry stage using the host and SSH user in the VM entity. It does not
 rewrite the original request. Software installs are additive; an empty selection installs nothing.
@@ -18,7 +19,9 @@ All three entry points share concurrency group `vm-<name>`, so operations on the
 are serialized. Distinct VMs can run concurrently. Inventory commits retry pull/rebase/push
 five times, using rebase autostash to preserve unrelated working-tree changes. Backstage refresh
 is best-effort and bounded to ten seconds per entity.
-`vms/.gitkeep` is permanent; each registered VM has `request.yaml` and `catalog-info.yaml`.
+`vms/.gitkeep` is permanent; each registered VM has `request.yaml` and `catalog-info.yaml`. The portal
+request task and VM page both read this catalog projection, so users can see validation, registration,
+Terraform, every fry job, finalization and failure handling without needing platform-repository access.
 
 ## Configuration and trust
 

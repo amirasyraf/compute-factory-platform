@@ -17,7 +17,7 @@ case "$action" in
     jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" \
       --arg size "$SIZE" --arg software "$SOFTWARE" --arg user "$REQUESTED_BY" --arg run "$GITHUB_RUN_ID" \
       --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"running",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/platform":$platform,"cf/os":$os,"cf/size":$size,"cf/team":$team,"cf/software":$software,"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/run-id":$run,"cf/run-url":$url}},spec:{type:"vm",owner:("group:default/"+$team),lifecycle:"poc"}}' \
+      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/stages":({provision:"pending",baseline:"pending",software:"pending","ad-join":"pending",access:"pending"}|tojson),"cf/processes":({validate:"success",register:"success",provision:"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending",finalize:"pending","on-failure":"pending"}|tojson),"cf/platform":$platform,"cf/os":$os,"cf/size":$size,"cf/team":$team,"cf/software":$software,"cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/requested-by":$user,"cf/run-id":$run,"cf/run-url":$url}},spec:{type:"vm",owner:("group:default/"+$team),lifecycle:"poc"}}' \
       | yq -P '.' > "$file"
     ;;
   update)
@@ -34,6 +34,30 @@ case "$action" in
       stages=$(yq -r '.metadata.annotations."cf/stages"' "$file" | jq -c --arg stage "$STAGE" --arg status "$STAGE_STATUS" '.[$stage]=$status')
       export stages
       yq -i '.metadata.annotations."cf/stages" = strenv(stages)' "$file"
+      process="$STAGE"
+      case "$STAGE" in
+        baseline) process=fry-baseline ;;
+        software) process=fry-software ;;
+        ad-join) process=fry-ad-join ;;
+        access) process=fry-access ;;
+      esac
+      export process
+      processes=$(yq -r '.metadata.annotations."cf/processes" // "{}"' "$file" | jq -c --arg process "$process" --arg status "$STAGE_STATUS" '.[$process]=$status')
+      export processes
+      yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
+    fi
+    if [[ -n "${PROCESS:-}" || -n "${PROCESS_STATUS:-}" ]]; then
+      [[ "${PROCESS:-}" =~ ^(validate|register|provision|fry-baseline|fry-software|fry-ad-join|fry-access|finalize|on-failure)$ ]] || exit 1
+      [[ "${PROCESS_STATUS:-}" =~ ^(pending|running|success|failed|skipped)$ ]] || exit 1
+      export PROCESS PROCESS_STATUS
+      processes=$(yq -r '.metadata.annotations."cf/processes" // "{}"' "$file" | jq -c --arg process "$PROCESS" --arg status "$PROCESS_STATUS" '.[$process]=$status')
+      export processes
+      yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
+    fi
+    if [[ "${STATUS:-}" == ready ]]; then
+      processes=$(yq -r '.metadata.annotations."cf/processes" // "{}"' "$file" | jq -c '.finalize="success" | ."on-failure"="skipped"')
+      export processes
+      yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
     fi
     ;;
   outputs)
@@ -46,6 +70,9 @@ case "$action" in
     stages=$(yq -r '.metadata.annotations."cf/stages"' "$file" | jq -c 'with_entries(if .value=="running" then .value="failed" else . end)')
     export stages
     yq -i '.metadata.annotations."cf/status" = "failed" | .metadata.annotations."cf/stages" = strenv(stages)' "$file"
+    processes=$(yq -r '.metadata.annotations."cf/processes" // "{}"' "$file" | jq -c 'with_entries(if .value=="running" then .value="failed" else . end) | ."on-failure"="success"')
+    export processes
+    yq -i '.metadata.annotations."cf/processes" = strenv(processes)' "$file"
     ;;
   delete) git rm -r -- "vms/$NAME" ;;
   *) echo 'Unknown inventory action' >&2; exit 1 ;;
