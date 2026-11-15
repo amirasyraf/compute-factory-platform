@@ -30,6 +30,13 @@ every fry job, finalization, deletion and failure handling without repository ac
 
 ### One desired-configuration source
 
+Before dispatch, the VM request template runs `cf:servicenow:create` in the IDP backend. It POSTs
+VM name/team/compute and authenticated requester/task identity to the IDP's mock ServiceNow REST
+endpoint, which returns HTTP 201 and a fake `RITM…` number. This is a stateless integration demo, not
+a real ServiceNow ticket or approval gate. Failure stops dispatch; the number appears in task logs
+and successful task output only, not VM inventory or GHA inputs. Refry/destroy and direct workflow
+dispatch are unchanged. The matching backend action must be available before using this template.
+
 The request template dispatches `name`, `spec_json`, `requested_by` and `requester_teams`.
 `spec_json` is a JSON Resource spec; identity/group claims remain server-supplied authorization
 context, not user-editable desired state. Validation normalizes the owner to `group:default/<team>`
