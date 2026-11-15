@@ -5,7 +5,7 @@ metadata:
   title: e2e-alpha
   description: ubuntu VM on aws (S) for team alpha
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/platform: aws
     cf/os: ubuntu
@@ -16,8 +16,8 @@ metadata:
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0cd3d11d950d8f3c2"
     cf/requested-by: amirasyraf
-    cf/run-id: "43691001653"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43691001653
+    cf/run-id: "43694441436"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43694441436
 spec:
   type: vm
   owner: group:default/alpha
