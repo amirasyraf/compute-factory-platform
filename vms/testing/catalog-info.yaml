@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: testing
+  title: testing
+  description: ubuntu VM on aws (S) for team alpha
+  annotations:
+    cf/status: provisioning
+    cf/stages: '{"provision":"pending","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/platform: aws
+    cf/os: ubuntu
+    cf/size: S
+    cf/team: alpha
+    cf/software: nginx,docker
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/requested-by: amirasyraf
+    cf/run-id: "43697017764"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43697017764
+spec:
+  type: vm
+  owner: group:default/alpha
+  lifecycle: poc
