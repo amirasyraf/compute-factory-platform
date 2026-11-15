@@ -1,0 +1,13 @@
+name: testing
+team: alpha
+platform: aws
+os: ubuntu
+size: S
+software:
+  - git
+  - nginx
+  - docker
+ad_join: true
+requested_by: amirasyraf
+requested_at: "2026-11-15T09:36:55Z"
+run_id: "43700073509"
