@@ -68,10 +68,11 @@ spec:
           requested_by: ${{ user.entity.metadata.name }}
           requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
     - id: monitor
-      name: Monitor all VM pipeline processes
-      action: cf:watch-vm
+      name: Monitor VM workflow
+      action: cf:watch-workflow
       input:
-        name: ${{ parameters.name }}
+        operation: provision
+        workflowRunId: ${{ steps.dispatch.output.workflowRunId }}
   output:
     links:
       - title: Open VM in catalog

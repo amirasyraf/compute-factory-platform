@@ -55,6 +55,12 @@ spec:
           software: ${{ parameters.software | join(',') }}
           requested_by: ${{ user.entity.metadata.name }}
           requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
+    - id: monitor
+      name: Monitor fry workflow
+      action: cf:watch-workflow
+      input:
+        operation: refry
+        workflowRunId: ${{ steps.dispatch.output.workflowRunId }}
   output:
     links:
       - title: Open VM in catalog

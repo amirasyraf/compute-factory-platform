@@ -20,8 +20,9 @@ are serialized. Distinct VMs can run concurrently. Inventory commits retry pull/
 five times, using rebase autostash to preserve unrelated working-tree changes. Backstage refresh
 is best-effort and bounded to ten seconds per entity.
 `vms/.gitkeep` is permanent; each registered VM has `request.yaml` and `catalog-info.yaml`. The portal
-request task and VM page both read this catalog projection, so users can see validation, registration,
-Terraform, every fry job, finalization and failure handling without needing platform-repository access.
+request task and VM page both read this catalog projection, while the request, refry and destroy tasks
+stream their GitHub Actions jobs and steps directly. Users can see validation, registration, Terraform,
+every fry job, finalization, deletion and failure handling without repository access.
 
 ## Configuration and trust
 
