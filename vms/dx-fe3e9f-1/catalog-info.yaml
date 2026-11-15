@@ -1,0 +1,33 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: dx-fe3e9f-1
+  title: dx-fe3e9f-1
+  description: ubuntu VM on aws (S) for team teamb
+  annotations:
+    cf/status: provisioning
+    cf/stages: '{"provision":"pending","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/requested-by: user4
+    cf/requested-at: "2026-11-15T21:30:42Z"
+    cf/run-id: "43764057054"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43764057054
+    cf/request-id: f1581e5402f64ea8a7853e4ad676f02c
+    cf/provision-run-id: "43764057054"
+spec:
+  type: vm
+  owner: group:default/teamb
+  lifecycle: poc
+  compute:
+    platform: aws
+    os: ubuntu
+    size: S
+  configuration:
+    software: []
+    adJoin: false
+  billing: {}
+  cloudTags:
+    purpose: demo-mode-e2e
