@@ -1,0 +1,12 @@
+name: e2e-alpha
+team: alpha
+platform: aws
+os: ubuntu
+size: S
+software:
+  - git
+  - docker
+ad_join: true
+requested_by: amirasyraf
+requested_at: "2026-11-15T07:40:55Z"
+run_id: "43691001653"
