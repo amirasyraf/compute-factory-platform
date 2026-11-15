@@ -6,8 +6,8 @@ metadata:
   description: ubuntu VM on aws (S) for team alpha
   annotations:
     cf/status: provisioning
-    cf/stages: '{"provision":"pending","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/stages: '{"provision":"running","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"running","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
     cf/platform: aws
     cf/os: ubuntu
     cf/size: S
