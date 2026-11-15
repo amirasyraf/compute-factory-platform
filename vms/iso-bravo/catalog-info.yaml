@@ -6,7 +6,7 @@ metadata:
   description: ubuntu VM on aws (S) for team bravo
   annotations:
     cf/status: frying
-    cf/stages: '{"provision":"success","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/stages: '{"provision":"success","baseline":"pending","software":"skipped","ad-join":"pending","access":"pending"}'
     cf/platform: aws
     cf/os: ubuntu
     cf/size: S
