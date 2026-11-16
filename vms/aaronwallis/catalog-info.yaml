@@ -5,9 +5,9 @@ metadata:
   title: aaronwallis
   description: ubuntu VM on aws (S) for team teama
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/stages: '{"provision":"success","baseline":"success","software":"skipped","ad-join":"success","access":"success"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"skipped","fry-ad-join":"success","fry-access":"success","finalize":"pending","on-failure":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"skipped","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "13.211.180.133"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-06ca0ac3dfd79ba27"
@@ -18,6 +18,7 @@ metadata:
     cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43800177474
     cf/request-id: 512b3193-3517-4226-8c1d-0f5d7ebf7abc
     cf/provision-run-id: "43800177474"
+    cf/ready-at: "2026-11-16T03:51:33Z"
 spec:
   type: vm
   owner: group:default/teama
