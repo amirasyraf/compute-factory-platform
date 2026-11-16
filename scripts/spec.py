@@ -2,6 +2,10 @@
 import json
 import re
 import sys
+from pathlib import Path
+
+# The platform's size map (also read by Terraform and the IDP); sizes are its keys.
+SIZES = json.loads((Path(__file__).resolve().parent.parent / "terraform/platforms/aws/sizes.json").read_text())
 
 
 def fields(value, allowed, required=()):
@@ -30,9 +34,20 @@ def normalize(spec):
     if not re.fullmatch(r"[a-z][a-z0-9-]*", owner):
         raise ValueError("Owner must be a default-namespace group")
     compute = spec["compute"]
-    fields(compute, ["platform", "os", "size"], ["platform", "os", "size"])
-    if compute["platform"] != "aws" or compute["os"] != "ubuntu" or compute["size"] not in ("S", "M", "L"):
-        raise ValueError("Unsupported compute platform, OS or size")
+    fields(compute, ["platform", "os", "size", "instanceType"], ["platform", "os"])
+    if compute["platform"] != "aws" or compute["os"] != "ubuntu":
+        raise ValueError("Unsupported compute platform or OS")
+    # Exactly one of a platform size or an explicit EC2 instance type (advanced picker).
+    if ("size" in compute) == ("instanceType" in compute):
+        raise ValueError("Specify exactly one of compute.size or compute.instanceType")
+    if "size" in compute and compute["size"] not in SIZES:
+        raise ValueError("Unsupported size")
+    if "instanceType" in compute and (
+        not isinstance(compute["instanceType"], str)
+        or not re.fullmatch(r"[a-z][a-z0-9-]*\.[a-z0-9]+", compute["instanceType"])
+        or compute["instanceType"].startswith("mac")
+    ):
+        raise ValueError("Unsupported instance type")
     configuration = spec.get("configuration", {})
     fields(configuration, ["software", "adJoin"])
     software = configuration.get("software", [])

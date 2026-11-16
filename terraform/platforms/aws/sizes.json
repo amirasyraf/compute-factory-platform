@@ -1,4 +1,5 @@
 {
+  "XS": "t3.micro",
   "S": "t3.small",
   "M": "t3.medium",
   "L": "t3.large"

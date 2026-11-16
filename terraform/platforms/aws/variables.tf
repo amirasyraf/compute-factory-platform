@@ -20,10 +20,20 @@ variable "os" {
 variable "size" {
   type        = string
   default     = "S"
-  description = "Platform-independent size."
+  description = "Platform-independent size; a key of sizes.json. Ignored when instance_type is set."
   validation {
-    condition     = contains(["S", "M", "L"], var.size)
-    error_message = "Size must be S, M or L."
+    condition     = can(regex("^[A-Z]{1,4}$", var.size))
+    error_message = "Size must be a sizes.json key such as XS, S, M or L."
+  }
+}
+
+variable "instance_type" {
+  type        = string
+  default     = ""
+  description = "Explicit EC2 instance type from the IDP advanced picker; overrides size."
+  validation {
+    condition     = can(regex("^$|^[a-z][a-z0-9-]*\\.[a-z0-9]+$", var.instance_type))
+    error_message = "instance_type must look like m7i.large."
   }
 }
 

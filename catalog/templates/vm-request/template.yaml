@@ -27,7 +27,10 @@ spec:
           title: Compute
           type: object
           additionalProperties: false
-          required: [platform, os, size]
+          required: [platform, os]
+          # IDP field: size cards (XS-L) with live AWS specs, plus an "Advanced" instance-type
+          # picker. It submits exactly one of size or instanceType.
+          ui:field: VmComputePicker
           properties:
             platform:
               title: Platform
@@ -42,10 +45,13 @@ spec:
             size:
               title: Size
               type: string
-              default: S
-              enum: [S, M, L]
-              # IDP field: shows each size's instance type and live AWS specs.
-              ui:field: VmSizePicker
+              # No schema default: the form would re-add it beside an advanced instanceType.
+              # VmComputePicker preselects S instead.
+              enum: [XS, S, M, L]
+            instanceType:
+              title: Instance type
+              type: string
+              pattern: '^[a-z][a-z0-9-]*\.[a-z0-9]+$'
         configuration:
           title: Configuration
           type: object
@@ -103,7 +109,7 @@ spec:
         team: ${{ parameters.team }}
         platform: ${{ parameters.compute.platform }}
         os: ${{ parameters.compute.os }}
-        size: ${{ parameters.compute.size }}
+        size: ${{ parameters.compute.instanceType or parameters.compute.size }}
     - id: dispatch
       name: Start VM pipeline
       action: cf:vm:dispatch

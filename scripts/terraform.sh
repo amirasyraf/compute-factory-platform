@@ -20,7 +20,7 @@ if [[ "$action" == apply ]]; then
   trap 'rm -f "$vars_file"; rmdir "$vars_dir"' EXIT
   requested_by=$(yq -r '.metadata.annotations."cf/requested-by"' "vms/$NAME/catalog-info.yaml")
   jq --arg name "$NAME" --arg user "$requested_by" \
-    '{name:$name,os:.compute.os,size:.compute.size,team:(.owner|split("/")[-1]),requested_by:$user,
+    '{name:$name,os:.compute.os,size:(.compute.size // "S"),instance_type:(.compute.instanceType // ""),team:(.owner|split("/")[-1]),requested_by:$user,
       cloud_tags:(.cloudTags + (.billing | with_entries(.key = (if .key=="costCenter" then "billing:cost-center" else "billing:project-code" end))))}' \
     <<< "$SPEC_JSON" > "$vars_file"
   terraform -chdir="$dir" apply -input=false -auto-approve -var-file="$vars_file"

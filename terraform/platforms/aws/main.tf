@@ -23,6 +23,19 @@ data "aws_vpc" "default" {
   default = true
 }
 
+data "aws_ec2_instance_type" "selected" {
+  instance_type = local.instance_type
+}
+
+# Not every type is offered in every AZ; launch only into a default subnet whose AZ offers it.
+data "aws_ec2_instance_type_offerings" "selected" {
+  location_type = "availability-zone"
+  filter {
+    name   = "instance-type"
+    values = [local.instance_type]
+  }
+}
+
 data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
@@ -31,6 +44,10 @@ data "aws_subnets" "default" {
   filter {
     name   = "default-for-az"
     values = ["true"]
+  }
+  filter {
+    name   = "availability-zone"
+    values = data.aws_ec2_instance_type_offerings.selected.locations
   }
 }
 
@@ -68,7 +85,7 @@ resource "aws_security_group" "vm" {
 
 resource "aws_instance" "vm" {
   ami                         = data.aws_ami.golden.id
-  instance_type               = local.sizes[var.size]
+  instance_type               = local.instance_type
   subnet_id                   = sort(data.aws_subnets.default.ids)[0]
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.vm.id]
@@ -84,5 +101,15 @@ resource "aws_instance" "vm" {
   tags = {
     Name              = "cf-${var.name}"
     "cf:requested-by" = var.requested_by
+  }
+  lifecycle {
+    precondition {
+      condition     = contains(data.aws_ec2_instance_type.selected.supported_architectures, "x86_64")
+      error_message = "${local.instance_type} cannot boot the x86_64 golden image."
+    }
+    precondition {
+      condition     = length(data.aws_subnets.default.ids) > 0
+      error_message = "${local.instance_type} is not offered in any default-subnet AZ in this region."
+    }
   }
 }

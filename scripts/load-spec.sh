@@ -13,7 +13,8 @@ spec_environment() {
   TEAM=$(jq -r '.owner | split("/")[-1]' <<< "$SPEC_JSON")
   PLATFORM=$(jq -r '.compute.platform' <<< "$SPEC_JSON")
   OS=$(jq -r '.compute.os' <<< "$SPEC_JSON")
-  SIZE=$(jq -r '.compute.size' <<< "$SPEC_JSON")
+  # A size letter, or the explicit instance type chosen in the advanced picker.
+  SIZE=$(jq -r '.compute.size // .compute.instanceType' <<< "$SPEC_JSON")
   SOFTWARE=$(jq -c '.configuration.software' <<< "$SPEC_JSON")
   AD_JOIN=$(jq -r '.configuration.adJoin' <<< "$SPEC_JSON")
   export SPEC_JSON TEAM PLATFORM OS SIZE SOFTWARE AD_JOIN

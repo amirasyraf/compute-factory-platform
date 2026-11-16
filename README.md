@@ -147,7 +147,10 @@ belong to `compute-factory` / `compute-factory-builder`, not this repository.
 - **Platform:** add `terraform/platforms/<platform>/` with the same variables (`name`, `os`,
   `size`, `team`, `requested_by`, `cloud_tags`) and outputs (`public_ip`, `ssh_user`, `instance_id`,
   `instance_type`), plus a platform size map. For AWS the map is `terraform/platforms/aws/sizes.json`
-  (`S`/`M`/`L` to instance type), read by Terraform and by the IDP request form; provisioning records the
+  (`XS`/`S`/`M`/`L` to `t3.micro`/`small`/`medium`/`large`), read by `scripts/spec.py`, Terraform and the
+  IDP request form. A spec carries exactly one of `compute.size` or `compute.instanceType` (an explicit
+  EC2 type from the IDP's Advanced picker; Terraform's `instance_type` variable). Terraform checks that
+  the type boots x86_64 and launches into a default subnet whose AZ offers it; provisioning records the
   launched type in the `cf/instance-type` annotation. Only `name` is required, so lifecycle teardown can destroy with just
   `-var name=<name>`. Add the platform's OIDC authentication, spec validation and template enum.
 - **OS:** bake its golden image with the matching `cf:os` tag, add the SSH-user map entry,
