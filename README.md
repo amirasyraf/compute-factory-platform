@@ -64,10 +64,10 @@ request provenance (`cf/requested-by`, `cf/requested-at`). Status writes do not 
 `scripts/spec.py` validates types and supported fields at workflow boundaries (Python 3 standard
 library). It rejects unsupported compute/software, unknown section fields, malformed owner refs,
 string booleans, duplicate software, control characters, more than 40 custom tags, and reserved tag
-keys (`Name`, `cf:`, `aws:`, `billing:`; case-insensitive). Custom tag keys are 1–128 characters;
-values are strings up to 256 characters. Optional billing keys are `costCenter` and `projectCode`,
-nonempty strings up to 256 characters, mapped to AWS `billing:cost-center`/`billing:project-code`
-tags. These are self-reported metadata, not validated organizational billing authorization.
+keys (`Name`, `cost_center`, `project_code`, `cf:`, `aws:`, `billing:`; case-insensitive). Custom tag
+keys are 1–128 characters; values are strings up to 256 characters. Billing keys are `costCenter` and
+`projectCode`, nonempty strings up to 256 characters, mapped to AWS `cost_center`/`project_code` tags.
+The request form and IDP require both for new VMs; `spec.py` accepts specs without them (older VMs). These are self-reported metadata, not validated organizational billing authorization.
 Mandatory POC/ownership tags remain platform-controlled. No secrets belong in catalog specs or tags.
 Optional configuration defaults to no software/no AD join; billing and tags default to empty objects.
 

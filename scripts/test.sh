@@ -87,7 +87,7 @@ export CAPTURED_VARS="$tmp/applied.json"
 # Terraform must consume the entity, not the original dispatch or legacy annotations.
 yq -i '.spec.compute.size = "M"' "vms/$NAME/catalog-info.yaml"
 SIZE=L TEAM=bravo SOFTWARE=nginx AD_JOIN=true bash scripts/terraform.sh apply
-jq -e '.size=="M" and .instance_type=="" and .team=="alpha" and .requested_by=="tester" and .cloud_tags=={"environment":"test","billing:cost-center":"CC-123","billing:project-code":"P-1"}' "$CAPTURED_VARS"
+jq -e '.size=="M" and .instance_type=="" and .team=="alpha" and .requested_by=="tester" and .cloud_tags=={"environment":"test","cost_center":"CC-123","project_code":"P-1"}' "$CAPTURED_VARS"
 unset -f terraform
 yq -o=json '.metadata.annotations' "vms/$NAME/catalog-info.yaml" | jq -e '.["cf/instance-id"]=="i-test" and .["cf/instance-type"]=="t3.small"'
 yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.["software"]=="skipped" and .["ad-join"]=="skipped"'
@@ -134,6 +134,9 @@ test -f vms/other-vm/catalog-info.yaml
 # Advanced picker: an explicit instance type replaces size; exactly one of the two is accepted.
 advanced='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","instanceType":"m7i.large"}}'
 python3 scripts/spec.py <<< "$advanced" | jq -e '.compute.instanceType=="m7i.large" and (.compute|has("size")|not)'
+if python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"cloudTags":{"Cost_Center":"x"}}' 2>/dev/null; then
+  echo 'Reserved cost_center tag accepted' >&2; exit 1
+fi
 for bad in '"size":"S","instanceType":"t3.small"' '"size":"XL"' '"instanceType":"mac2.metal"' '"instanceType":"m7i large"'; do
   if python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{\"platform\":\"aws\",\"os\":\"ubuntu\",$bad}}" 2>/dev/null; then
     echo "Invalid compute accepted: $bad" >&2; exit 1

@@ -68,7 +68,7 @@ def normalize(spec):
     for key, value in tags.items():
         text(key, 128)
         # Reserve policy, identity and billing tags; arbitrary user tags cannot override them.
-        if key.lower() == "name" or key.lower().startswith(("cf:", "aws:", "billing:")):
+        if key.lower() in ("name", "cost_center", "project_code") or key.lower().startswith(("cf:", "aws:", "billing:")):
             raise ValueError("Reserved cloud tag")
         if not isinstance(value, str) or len(value) > 256 or any(ord(c) < 32 or ord(c) == 127 for c in value):
             raise ValueError("Tag values must be bounded strings without control characters")

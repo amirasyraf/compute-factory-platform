@@ -12,7 +12,7 @@ spec:
   type: infrastructure
   parameters:
     - title: VM request
-      required: [name, team, compute, configuration]
+      required: [name, team, compute, configuration, tags]
       properties:
         name:
           title: VM name
@@ -71,35 +71,36 @@ spec:
               title: Join AD (mock)
               type: boolean
               default: false
-        billing:
-          title: Billing metadata (optional, self-reported)
-          description: Informational AWS tags, not billing authorization. Do not enter secrets.
+        tags:
+          title: Tags
+          description: AWS tags on the VM. cost_center and project_code are required and self-reported (not billing authorization). Do not enter secrets.
           type: object
           additionalProperties: false
-          default: {}
+          required: [costCenter, projectCode]
+          # IDP field: one key/value table; fixed cost_center/project_code rows plus optional tags.
+          ui:field: VmTagsEditor
           properties:
             costCenter:
-              title: Cost center
+              title: cost_center
               type: string
               minLength: 1
               maxLength: 256
             projectCode:
-              title: Project code
+              title: project_code
               type: string
               minLength: 1
               maxLength: 256
-        cloudTags:
-          title: Additional AWS tags (optional)
-          description: 'Up to 40 string tags. Name and cf:/aws:/billing: prefixes are reserved. No secrets.'
-          type: object
-          default: {}
-          maxProperties: 40
-          propertyNames:
-            maxLength: 128
-            minLength: 1
-          additionalProperties:
-            type: string
-            maxLength: 256
+            extra:
+              title: Additional tags
+              type: object
+              default: {}
+              maxProperties: 40
+              propertyNames:
+                maxLength: 128
+                minLength: 1
+              additionalProperties:
+                type: string
+                maxLength: 256
   steps:
     - id: servicenow
       name: Create ServiceNow request (mock)
@@ -118,7 +119,8 @@ spec:
         specJson: >-
           {"type":"vm","owner":${{ parameters.team | dump }},"lifecycle":"poc",
           "compute":${{ parameters.compute | dump }},"configuration":${{ parameters.configuration | dump }},
-          "billing":${{ parameters.billing | default({}) | dump }},"cloudTags":${{ parameters.cloudTags | default({}) | dump }}}
+          "billing":{"costCenter":${{ parameters.tags.costCenter | dump }},"projectCode":${{ parameters.tags.projectCode | dump }}},
+          "cloudTags":${{ parameters.tags.extra | default({}) | dump }}}
     - id: monitor
       name: Monitor VM workflow
       action: cf:watch-workflow
