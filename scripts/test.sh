@@ -103,6 +103,11 @@ grep -q '^host=192.0.2.10$' "$GITHUB_OUTPUT"
 configured=$(grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
 yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -e '.configuration.software==["htop"] and .compute.size=="M" and .billing.costCenter=="CC-123"'
+# Software refry is additive: an empty selection keeps the recorded list, a new one is appended.
+SOFTWARE_INPUT='[]' STAGE=software bash scripts/validate.sh existing
+grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- | jq -e '.configuration.software==["htop"]'
+SOFTWARE_INPUT='["git","htop"]' STAGE=software bash scripts/validate.sh existing
+grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- | jq -e '.configuration.software==["htop","git"]'
 STAGE=ad-join bash scripts/validate.sh existing
 configured=$(grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
 SPEC_JSON="$configured" bash scripts/inventory.sh configure

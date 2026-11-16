@@ -107,12 +107,14 @@ if ! git diff --cached --quiet; then
   git commit -m "vm($NAME): $action ${STAGE:-} ${STAGE_STATUS:-} ${STATUS:-}"
 fi
 pushed=false
-for attempt in 1 2 3 4 5; do
+for attempt in 1 2 3 4 5 6 7 8; do
   if git pull --rebase --autostash origin main && git push origin HEAD:main; then
     pushed=true
     break
   fi
-  echo "Concurrent inventory push; retry $attempt/5" >&2
+  echo "Concurrent inventory push; retry $attempt/8" >&2
+  # Jittered backoff so concurrent VM runs stop colliding on the same push.
+  sleep $((attempt + RANDOM % (attempt * 2 + 1)))
 done
 [[ "$pushed" == true ]] || { echo 'Inventory push failed' >&2; exit 1; }
 bash scripts/refresh.sh "resource:default/$NAME"

@@ -11,9 +11,10 @@ records both the five user-facing `cf/stages` and the complete nine-job `cf/proc
 processes are marked failed if a job fails. Failed VMs remain available for diagnosis.
 
 `fry.yml` re-runs one fry stage using the host and SSH user in the VM entity. Before applying,
-software refry saves the selected list in `spec.configuration.software`; AD refry sets
-`spec.configuration.adJoin=true`. Other desired settings and original requester provenance are
-preserved. Software installs are additive: removing an entry from desired software does not uninstall it.
+software refry adds the selected packages to `spec.configuration.software` (an empty selection keeps
+the list); AD refry sets `spec.configuration.adJoin=true`. Other desired settings and original
+requester provenance are preserved. Software installs are additive and nothing is uninstalled, so the
+recorded list only grows.
 `destroy.yml` checks ownership, marks destroying, destroys the VM, deletes its S3 state object,
 then removes `vms/<name>/`. The VM catalog entity is subsequently orphaned and deleted.
 

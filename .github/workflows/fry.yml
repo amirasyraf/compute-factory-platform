@@ -10,7 +10,7 @@ on:
         type: string
         required: true
       software:
-        description: JSON software array; software refry persists it in spec.configuration.software
+        description: JSON software array; software refry adds it to spec.configuration.software
         type: string
         default: '[]'
       requested_by:

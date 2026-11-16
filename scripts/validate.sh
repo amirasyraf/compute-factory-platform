@@ -21,7 +21,9 @@ team_guard "$TEAM" "${REQUESTER_TEAMS:-}"
 if [[ -n "${STAGE:-}" ]]; then
   [[ "$STAGE" =~ ^(baseline|software|ad-join|access)$ ]] || { echo 'Unknown fry stage' >&2; exit 1; }
   if [[ "$STAGE" == software ]]; then
-    SPEC_JSON=$(jq --argjson software "${SOFTWARE_INPUT:-[]}" '.configuration.software=$software' <<< "$SPEC_JSON" | python3 scripts/spec.py)
+    # Installs are additive, so the recorded list is the union: an empty or partial
+    # selection adds packages and never erases what is already installed.
+    SPEC_JSON=$(jq --argjson software "${SOFTWARE_INPUT:-[]}" '.configuration.software += ($software - .configuration.software)' <<< "$SPEC_JSON" | python3 scripts/spec.py)
   elif [[ "$STAGE" == ad-join ]]; then
     SPEC_JSON=$(jq '.configuration.adJoin=true' <<< "$SPEC_JSON" | python3 scripts/spec.py)
   fi

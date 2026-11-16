@@ -30,7 +30,7 @@ spec:
           enum: [baseline, software, ad-join, access]
           default: software
         software:
-          title: Desired software (saved before software refry; installs are additive)
+          title: Software to add (software refry; already-installed software is kept)
           type: array
           default: []
           uniqueItems: true
