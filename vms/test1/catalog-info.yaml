@@ -5,7 +5,7 @@ metadata:
   title: test1
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "16.176.137.213"
@@ -14,8 +14,8 @@ metadata:
     cf/instance-type: "t3.micro"
     cf/requested-by: user1
     cf/requested-at: "2026-11-16T00:16:51Z"
-    cf/run-id: "43779404801"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43779404801
+    cf/run-id: "43780475259"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43780475259
     cf/request-id: 8a98be49-b0ff-4544-97cf-8cfcaa013d49
     cf/provision-run-id: "43779404801"
     cf/ready-at: "2026-11-16T00:22:25Z"
