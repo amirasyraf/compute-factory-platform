@@ -8,10 +8,10 @@ metadata:
     cf/status: provisioning
     cf/stages: '{"provision":"running","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
     cf/processes: '{"validate":"success","register":"success","provision":"running","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
-    cf/public-ip: ""
+    cf/public-ip: "13.211.180.133"
     cf/ssh-user: ubuntu
-    cf/instance-id: ""
-    cf/instance-type: ""
+    cf/instance-id: "i-06ca0ac3dfd79ba27"
+    cf/instance-type: "t3.small"
     cf/requested-by: user1
     cf/requested-at: "2026-11-16T03:47:02Z"
     cf/run-id: "43800177474"
