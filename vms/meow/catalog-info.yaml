@@ -5,7 +5,7 @@ metadata:
   title: meow
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
     cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "3.107.113.103"
@@ -14,8 +14,8 @@ metadata:
     cf/instance-type: "t3.micro"
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T01:40:34Z"
-    cf/run-id: "43997323904"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43997323904
+    cf/run-id: "43998706408"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43998706408
     cf/request-id: 142b285f-3188-4561-9440-b984dbae31e4
     cf/provision-run-id: "43997323904"
     cf/ready-at: "2026-11-17T01:46:24Z"
