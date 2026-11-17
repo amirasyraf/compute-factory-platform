@@ -5,7 +5,7 @@ metadata:
   title: testing
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/public-ip: "3.107.113.74"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0802a005bfbe034a0"
@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T20:32:56Z"
     cf/request-id: c67adb0a-c9ad-4276-baa5-5efbb144eeb1
-    cf/run-id: "44171628825"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44171628825
+    cf/run-id: "44187582580"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44187582580
     cf/ready-at: "2026-11-17T20:39:55Z"
 spec:
   type: vm
