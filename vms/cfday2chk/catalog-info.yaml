@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T10:17:54Z"
     cf/request-id: 6c52add9-7dff-4181-9ae8-56187a998c23
-    cf/run-id: "44066237133"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44066237133
+    cf/run-id: "44066389021"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44066389021
     cf/ready-at: "2026-11-17T10:22:56Z"
 spec:
   type: vm
