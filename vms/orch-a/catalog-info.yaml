@@ -5,7 +5,7 @@ metadata:
   title: orch-a
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "16.179.47.184"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0773b047e73a09dfa"
