@@ -4,7 +4,7 @@ set -euo pipefail
 # Manual destroy remains unchanged. Automatic cleanup must be current and generation-bound.
 proceed=true
 if [[ -n "${DEMO_GENERATION:-}" ]]; then
-  file="vms/${NAME:?}/catalog-info.yaml"
+  file="${INVENTORY_ROOT:-.}/vms/${NAME:?}/catalog-info.yaml"
   [[ "$NAME" =~ ^[a-z][a-z0-9-]{2,20}$ ]] || exit 1
   proceed=false
   if [[ -f "$file" ]]; then

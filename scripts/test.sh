@@ -93,6 +93,15 @@ PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-test INSTANCE_TYPE=t3.small b
 REQUESTED_BY=operator validate baseline
 sed -n 's/^vars_json=//p' "$GITHUB_OUTPUT" | jq -e '.cf_requested_by=="tester" and .cf_software==["htop","git"] and .cf_team=="alpha"'
 grep -qx host=192.0.2.10 "$GITHUB_OUTPUT"
+# Execute pinned code from a checkout with no VM inventory, reading/writing a separate
+# current checkout. A destroy queued before registration must not become a false no-op.
+(
+  cd "$root"
+  : > "$GITHUB_OUTPUT"
+  INVENTORY_ROOT="$tmp/work" STAGE=destroy RUN_KEY=42.destroy.1 PARAMS_JSON='{}' bash scripts/validate.sh
+  grep -qx noop=false "$GITHUB_OUTPUT"
+  INVENTORY_ROOT="$tmp/work" STATUS=frying bash scripts/inventory.sh update
+)
 OUTCOME=ready bash scripts/inventory.sh finalize
 entity | jq -e '.metadata.annotations["cf/status"]=="ready" and (.metadata.annotations["cf/ready-at"]|test("^[0-9]{4}-")) and (.metadata.annotations|has("cf/failed-at")|not)'
 # Seed distinguishable old times to prove first-time semantics without sleeping.

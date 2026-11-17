@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Source after validating NAME. Only persisted spec is used for existing VMs.
 load_spec() {
-  local file="vms/$NAME/catalog-info.yaml"
+  local file="${INVENTORY_ROOT:-.}/vms/$NAME/catalog-info.yaml"
   [[ -f "$file" ]] || { echo 'Unknown VM' >&2; return 1; }
   [[ "$(yq -r '.kind' "$file")" == Resource && "$(yq -r '.metadata.name' "$file")" == "$NAME" ]] \
     || { echo 'VM entity identity mismatch' >&2; return 1; }

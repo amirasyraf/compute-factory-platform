@@ -22,7 +22,14 @@ Each dispatch supplies `stage`, `name`, `request_id`, `run_key`, `requested_by`,
 `run_key` is `<positive run id>.<stage>.<positive attempt>`, `request_id` is a stable incarnation
 matching `^[a-zA-Z0-9_-]{1,100}$`, and names match `^[a-z][a-z0-9-]{2,20}$`.
 
-One 20-minute job checks out the dispatched commit (`github.sha`). Its `Validate inputs` step
+One 20-minute job checks out executor code at the dispatched commit (`github.sha`), then
+`Load current inventory` checks out current `main` separately under `.current-inventory`.
+Workflow concurrency opens before either checkout, so a queued destroy sees registration
+committed while it was waiting, not the dispatch-time snapshot. `INVENTORY_ROOT` points all
+inventory reads/writes/Git commits at that separate checkout (default `.` for local scripts).
+Terraform, Ansible, validators and helpers still execute from the pinned executor checkout.
+Inventory retrieval failures are transient and never misclassified as validation failures.
+The `Validate inputs` step
 does all local input/spec/identity/team checks before mutations. Failure there is permanent;
 tool setup, OIDC, cleanup-check HTTP, AWS, SSH and Git writes happen later and are retryable.
 Concurrency `vm-<name>` serializes all attempts for a VM. Distinct VMs run concurrently.
@@ -190,6 +197,7 @@ mise exec -- bash scripts/test.sh
 ```
 
 `scripts/test.sh` uses real jq/yq/Git and an isolated local bare remote to exercise validation,
-inventory idempotency, config unions, provenance, first-time timestamps and missing-inventory
-no-ops. It does not invoke AWS/Terraform or prove live recovery behavior. Live stage/SSH/adoption
+inventory idempotency, config unions, provenance, first-time timestamps, missing-inventory
+no-ops and separate current-inventory reads/writes from pinned executor code. It does not
+invoke AWS/Terraform or prove live recovery behavior. Live stage/SSH/adoption
 verification belongs to the coordinated IDP cut-over; local checks do not claim that evidence.

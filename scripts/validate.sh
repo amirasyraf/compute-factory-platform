@@ -23,7 +23,7 @@ case "$STAGE" in
   finalize) jq -e 'keys == ["outcome"] and (.outcome == "ready" or .outcome == "failed")' <<< "$params" >/dev/null ;;
   *) jq -e '. == {}' <<< "$params" >/dev/null ;;
 esac
-file="vms/$NAME/catalog-info.yaml"
+file="${INVENTORY_ROOT:-.}/vms/$NAME/catalog-info.yaml"
 noop=false
 if [[ "$STAGE" == register ]]; then
   SPEC_JSON=$(jq -c '.spec' <<< "$params" | python3 scripts/spec.py)
@@ -35,7 +35,7 @@ if [[ "$STAGE" == register ]]; then
     team_guard "$TEAM" "$REQUESTER_TEAMS"
     noop=true
   else
-    [[ ! -e "vms/$NAME" ]] || fail 'VM directory exists without inventory'
+    [[ ! -e "${INVENTORY_ROOT:-.}/vms/$NAME" ]] || fail 'VM directory exists without inventory'
   fi
 elif [[ ! -f "$file" ]]; then
   [[ "$STAGE" == destroy || "$STAGE" == finalize ]] || fail 'Unknown VM'

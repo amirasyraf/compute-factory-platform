@@ -3,7 +3,8 @@ set -euo pipefail
 # Workflow concurrency serializes this VM; unrelated VM commits rebase below.
 [[ "${NAME:?}" =~ ^[a-z][a-z0-9-]{2,20}$ ]] || exit 1
 action=${1:?register, configure, update, outputs, finalize or delete}
-file="vms/$NAME/catalog-info.yaml"
+inventory_root=${INVENTORY_ROOT:-.}
+file="$inventory_root/vms/$NAME/catalog-info.yaml"
 export NAME
 if [[ "$action" == register && -f "$file" ]]; then
   [[ "$(yq -r '.metadata.annotations."cf/request-id"' "$file")" == "${REQUEST_ID:?}" ]] || { echo 'VM belongs to a different request' >&2; exit 1; }
@@ -21,12 +22,12 @@ if [[ "$action" != register ]]; then
 fi
 case "$action" in
   register)
-    [[ ! -e "vms/$NAME" ]] || { echo 'VM directory already exists' >&2; exit 1; }
+    [[ ! -e "$inventory_root/vms/$NAME" ]] || { echo 'VM directory already exists' >&2; exit 1; }
     SPEC_JSON=$(python3 scripts/spec.py <<< "${SPEC_JSON:?}")
     # shellcheck source=scripts/load-spec.sh
     source "$(dirname "$0")/load-spec.sh"
     spec_environment
-    mkdir -p "vms/$NAME"
+    mkdir -p "$inventory_root/vms/$NAME"
     jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" \
       --arg size "$SIZE" --arg user "${REQUESTED_BY:?}" --arg request "${REQUEST_ID:?}" \
       --arg requested_at "$(date -u +%FT%TZ)" --argjson spec "$SPEC_JSON" \
@@ -54,7 +55,7 @@ case "$action" in
     export OUTCOME timestamp timestamp_key
     yq -i '.metadata.annotations."cf/status" = strenv(OUTCOME) | .metadata.annotations[strenv(timestamp_key)] = (.metadata.annotations[strenv(timestamp_key)] // strenv(timestamp))' "$file"
     ;;
-  delete) git rm -r -- "vms/$NAME" ;;
+  delete) git -C "$inventory_root" rm -r -- "vms/$NAME" ;;
   *) echo 'Unknown inventory action' >&2; exit 1 ;;
 esac
 if [[ "$action" != delete ]]; then
@@ -63,13 +64,13 @@ if [[ "$action" != delete ]]; then
   export run_url
   yq -i '.metadata.annotations."cf/run-id" = strenv(GITHUB_RUN_ID) | .metadata.annotations."cf/run-url" = strenv(run_url)' "$file"
 fi
-git config user.name 'compute-factory[bot]'
-git config user.email 'compute-factory[bot]@users.noreply.github.com'
-if [[ "$action" != delete ]]; then git add -- "vms/$NAME"; fi
-if ! git diff --cached --quiet; then git commit -m "vm($NAME): $action ${STATUS:-} ${OUTCOME:-}"; fi
+git -C "$inventory_root" config user.name 'compute-factory[bot]'
+git -C "$inventory_root" config user.email 'compute-factory[bot]@users.noreply.github.com'
+if [[ "$action" != delete ]]; then git -C "$inventory_root" add -- "vms/$NAME"; fi
+if ! git -C "$inventory_root" diff --cached --quiet; then git -C "$inventory_root" commit -m "vm($NAME): $action ${STATUS:-} ${OUTCOME:-}"; fi
 pushed=false
 for attempt in 1 2 3 4 5 6 7 8; do
-  if git pull --rebase --autostash origin main && git push origin HEAD:main; then
+  if git -C "$inventory_root" pull --rebase --autostash origin main && git -C "$inventory_root" push origin HEAD:main; then
     pushed=true
     break
   fi

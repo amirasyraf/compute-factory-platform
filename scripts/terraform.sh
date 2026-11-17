@@ -3,7 +3,7 @@ set -euo pipefail
 action=${1:?apply or destroy}
 [[ "$action" == apply || "$action" == destroy ]] || exit 1
 [[ "${NAME:?}" =~ ^[a-z][a-z0-9-]{2,20}$ ]] || exit 1
-file="vms/$NAME/catalog-info.yaml"
+file="${INVENTORY_ROOT:-.}/vms/$NAME/catalog-info.yaml"
 [[ "$action" != destroy || -f "$file" ]] || exit 0
 [[ "$(yq -r '.metadata.annotations."cf/request-id"' "$file")" == "${REQUEST_ID:?}" ]] || exit 1
 # shellcheck source=scripts/load-spec.sh

@@ -47,10 +47,16 @@ jobs:
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
       BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
+      INVENTORY_ROOT: ${{ github.workspace }}/.current-inventory
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - name: Load current inventory
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .current-inventory
       - name: Validate inputs
         id: validate
         run: bash scripts/validate.sh
