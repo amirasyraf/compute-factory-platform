@@ -59,12 +59,12 @@ per-stage attempts and errors live in the IDP database, never inventory annotati
 
 ## Templates and progress
 
-`vm-request` first runs `cf:servicenow:create`: a real HTTP POST to the IDP mock ServiceNow
-receiver requiring HTTP 201. Its deterministic fake RITM is task output, not VM inventory or
-workflow input; this is not an approval gate or real ticket system. Then `cf:vm:dispatch`
-submits `{name, specJson}` to `/api/vms/requests`; authenticated identity, teams and the task ID
-are derived server-side. Admission reserves quota and creates the run idempotently by task ID.
-The task ends with **Follow provisioning** (`runUrl`) and **Open VM in catalog** links.
+`vm-request` has one step, `cf:vm:dispatch`, which submits `{name, specJson}` to
+`/api/vms/requests`; authenticated identity, teams and the task ID are derived server-side.
+Admission reserves quota and creates the run idempotently by task ID. The run's first stage, the
+mock ServiceNow request, runs inside the IDP (not in this repo); its fake RITM number is shown on
+the run page, not stored in VM inventory or passed to workflows. The IDP then takes the browser to
+the run page; the task also links **Follow provisioning** (`runUrl`) and **Open VM in catalog**.
 
 `vm-refry` and `vm-destroy` each have one `cf:vm:run` step. The action reads the chosen VM with
 initiating-user credentials and derives identity/teams server-side. Their **Follow run** link

@@ -102,15 +102,6 @@ spec:
                 type: string
                 maxLength: 256
   steps:
-    - id: servicenow
-      name: Create ServiceNow request (mock)
-      action: cf:servicenow:create
-      input:
-        vmName: ${{ parameters.name }}
-        team: ${{ parameters.team }}
-        platform: ${{ parameters.compute.platform }}
-        os: ${{ parameters.compute.os }}
-        size: ${{ parameters.compute.instanceType or parameters.compute.size }}
     - id: dispatch
       name: Start provisioning run
       action: cf:vm:dispatch
@@ -122,11 +113,6 @@ spec:
           "billing":{"costCenter":${{ parameters.tags.costCenter | dump }},"projectCode":${{ parameters.tags.projectCode | dump }}},
           "cloudTags":${{ parameters.tags.extra | default({}) | dump }}}
   output:
-    text:
-      - title: ServiceNow request (mock)
-        content: >-
-          Created **${{ steps.servicenow.output.number }}** via REST
-          (HTTP ${{ steps.servicenow.output.httpStatus }}). Demo only; no real ServiceNow ticket exists.
     links:
       - title: Follow provisioning
         url: ${{ steps.dispatch.output.runUrl }}
