@@ -5,7 +5,7 @@ metadata:
   title: cfday2chk
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/public-ip: "16.179.38.185"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-07bf84e7aef5feaa5"
@@ -13,8 +13,9 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T10:17:54Z"
     cf/request-id: 6c52add9-7dff-4181-9ae8-56187a998c23
-    cf/run-id: "44064149796"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44064149796
+    cf/run-id: "44064280645"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44064280645
+    cf/ready-at: "2026-11-17T10:22:56Z"
 spec:
   type: vm
   owner: group:default/teama
