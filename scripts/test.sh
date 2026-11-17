@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline integration checks: real yq/jq/git, isolated local bare remote, no AWS calls.
+# Offline integration checks: real yq/jq/git, isolated local bare remote, no AWS or mocks.
 set -euo pipefail
 root=$(pwd)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/cf-platform-tests.XXXXXX")
@@ -12,38 +12,55 @@ git config user.name test
 git config user.email test@example.invalid
 git remote add origin "$tmp/remote.git"
 cp -R "$root/scripts" scripts
-# spec.py reads the size map from the Terraform platform directory.
-mkdir -p terraform/platforms/aws
+mkdir -p terraform/platforms/aws vms ansible
 cp "$root/terraform/platforms/aws/sizes.json" terraform/platforms/aws/
-mkdir -p vms ansible
+cp "$root/ansible/software-catalog.yml" ansible/
 touch vms/.gitkeep
-printf 'git: {linux: git}\nhtop: {linux: htop}\nnginx: {linux: nginx}\ndocker: {linux: docker.io}\n' > ansible/software-catalog.yml
 git add .
 git commit -m fixture >/dev/null
 git push -u origin main >/dev/null
-export NAME=test-vm REQUESTER_TEAMS=group:default/alpha REQUESTED_BY=tester
+export NAME=test-vm REQUESTER_TEAMS=alpha REQUESTED_BY=tester REQUEST_ID=request-123
 export SPEC_JSON='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"configuration":{"software":[],"adJoin":false},"billing":{"costCenter":"CC-123","projectCode":"P-1"},"cloudTags":{"environment":"test"}}'
 export GITHUB_RUN_ID=123 GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=example/platform
-export BACKSTAGE_URL='' BACKSTAGE_TOKEN=''
-export GITHUB_OUTPUT="$tmp/outputs"
-bash scripts/validate.sh provision
-grep -q '^team=alpha$' "$GITHUB_OUTPUT"
-export TEAM=alpha
-REQUESTER_TEAMS=group:default/platform-admins bash scripts/team-guard.sh
-if REQUESTER_TEAMS=bravo bash scripts/team-guard.sh; then echo 'Guard allowed other team' >&2; exit 1; fi
-bad_spec=$(jq '.configuration.software=["not-allowed"]' <<< "$SPEC_JSON")
-if SPEC_JSON="$bad_spec" bash scripts/validate.sh provision; then echo 'Unknown software allowed' >&2; exit 1; fi
-if NAME=../../escape bash scripts/validate.sh provision; then echo 'Invalid name allowed' >&2; exit 1; fi
+export BACKSTAGE_URL='' BACKSTAGE_TOKEN='' GITHUB_OUTPUT="$tmp/outputs"
+file="vms/$NAME/catalog-info.yaml"
+validate() {
+  local params='{}'
+  if (( $# > 1 )); then params=$2; fi
+  : > "$GITHUB_OUTPUT"
+  STAGE="$1" RUN_KEY="42.$1.1" PARAMS_JSON="$params" bash scripts/validate.sh
+}
+reject() { if "$@"; then echo "Unexpected success: $*" >&2; exit 1; fi; }
+entity() { yq -o=json '.' "$file"; }
+register_params=$(jq -cn --argjson spec "$SPEC_JSON" '{spec:$spec}')
+validate register "$register_params"
+grep -qx noop=false "$GITHUB_OUTPUT"
+reject env REQUESTER_TEAMS=bravo STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
+reject env NAME=../../escape STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
+reject env REQUEST_ID=bad:id STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
+reject env STAGE=register RUN_KEY=42.access.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
+reject validate register '{"spec":{}}'
+reject validate provision '{"unexpected":true}'
+reject validate finalize '{"outcome":"running"}'
+reject validate destroy '{"demoGeneration":"not-a-uuid"}'
 bash scripts/inventory.sh register
 test -f vms/.gitkeep
 test ! -f "vms/$NAME/request.yaml"
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/request-id"]=="manual:123" and .metadata.annotations["cf/provision-run-id"]=="123"'
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.spec.owner=="group:default/alpha" and .spec.configuration.software==[] and .spec.configuration.adJoin==false and .metadata.annotations["cf/requested-by"]=="tester" and (.metadata.annotations|has("cf/software")|not)'
-yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["provision","baseline","software","ad-join","access"]'
-yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e 'keys_unsorted==["validate","register","provision","fry-baseline","fry-software","fry-ad-join","fry-access","finalize","on-failure"]'
-if bash scripts/validate.sh provision; then echo 'Duplicate VM allowed' >&2; exit 1; fi
+entity | jq -e '.metadata.annotations as $a | $a["cf/request-id"]=="request-123" and $a["cf/status"]=="provisioning" and $a["cf/requested-by"]=="tester" and (["cf/stages","cf/processes","cf/provision-run-id","cf/software"] | all(. as $k | $a | has($k) | not))'
+original=$(entity | jq -c .)
+validate register "$register_params"
+grep -qx noop=true "$GITHUB_OUTPUT"
+GITHUB_RUN_ID=999 bash scripts/inventory.sh register
+[[ "$(entity | jq -c .)" == "$original" ]]
+reject env REQUEST_ID=different STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
+reject env REQUEST_ID=different bash scripts/inventory.sh register
+reject env REQUEST_ID=different STAGE=provision RUN_KEY=42.provision.1 bash scripts/validate.sh
+REQUEST_ID=different validate finalize '{"outcome":"failed"}'
+grep -qx noop=true "$GITHUB_OUTPUT"
+REQUEST_ID=different OUTCOME=failed bash scripts/inventory.sh finalize
+[[ "$(entity | jq -c .)" == "$original" ]]
 
-# Simulate an unrelated VM commit after this runner's checkout, exercising pull/rebase.
+# Real concurrent inventory commit exercises pull/rebase and unrelated autostash preservation.
 git clone "$tmp/remote.git" "$tmp/other" >/dev/null
 git -C "$tmp/other" config user.name other
 git -C "$tmp/other" config user.email other@example.invalid
@@ -52,100 +69,68 @@ touch "$tmp/other/vms/other-vm/catalog-info.yaml"
 git -C "$tmp/other" add .
 git -C "$tmp/other" commit -m 'another VM' >/dev/null
 git -C "$tmp/other" push >/dev/null
-# Inventory rebasing must preserve, rather than depend on, unrelated dirty files.
 printf '# unrelated local edit\n' >> ansible/software-catalog.yml
-# Mock only the Terraform boundary, leaving real inventory/Git operations in place.
-# A runner must not modify tracked lockfiles before the inventory rebase.
-# Exported for the child shell running scripts/terraform.sh.
-# shellcheck disable=SC2329
-terraform() {
-  case "$2" in
-    init) [[ " $* " == *" -lockfile=readonly "* ]] ;;
-    apply)
-      local arg
-      for arg in "$@"; do
-        if [[ "$arg" == -var-file=* ]]; then cp "${arg#-var-file=}" "$CAPTURED_VARS"; fi
-      done
-      [[ -f "$CAPTURED_VARS" ]]
-      ;;
-    output)
-      case "$4" in
-        public_ip) printf 192.0.2.10 ;;
-        ssh_user) printf ubuntu ;;
-        instance_id) printf i-test ;;
-        instance_type) printf t3.small ;;
-        *) return 1 ;;
-      esac
-      ;;
-    *) return 1 ;;
-  esac
-}
-export -f terraform
-export AWS_REGION=ap-southeast-2 TF_STATE_BUCKET=test-bucket
-export CAPTURED_VARS="$tmp/applied.json"
-# Deliberately change the tracked entity and inject conflicting legacy environment values.
-# Terraform must consume the entity, not the original dispatch or legacy annotations.
-yq -i '.spec.compute.size = "M"' "vms/$NAME/catalog-info.yaml"
-SIZE=L TEAM=bravo SOFTWARE=nginx AD_JOIN=true bash scripts/terraform.sh apply
-jq -e '.size=="M" and .instance_type=="" and .team=="alpha" and .requested_by=="tester" and .cloud_tags=={"environment":"test","cost_center":"CC-123","project_code":"P-1"}' "$CAPTURED_VARS"
-unset -f terraform
-yq -o=json '.metadata.annotations' "vms/$NAME/catalog-info.yaml" | jq -e '.["cf/instance-id"]=="i-test" and .["cf/instance-type"]=="t3.small"'
-yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.["software"]=="skipped" and .["ad-join"]=="skipped"'
-yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.["fry-software"]=="skipped" and .["fry-ad-join"]=="skipped"'
+STATUS=frying bash scripts/inventory.sh update
 test -f vms/other-vm/catalog-info.yaml
 grep -q '# unrelated local edit' ansible/software-catalog.yml
-STAGE=baseline STAGE_STATUS=running bash scripts/inventory.sh update
-bash scripts/inventory.sh failure
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations as $a | $a["cf/status"]=="failed" and ($a["cf/stages"]|fromjson|.baseline)=="failed" and ($a["cf/processes"]|fromjson|."fry-baseline")=="failed" and ($a["cf/processes"]|fromjson|."on-failure")=="success"'
-if REQUESTER_TEAMS=bravo bash scripts/validate.sh existing; then echo 'Existing VM guard bypassed' >&2; exit 1; fi
-SOFTWARE_INPUT='["htop"]' STAGE=software bash scripts/validate.sh existing
-grep -q '^host=192.0.2.10$' "$GITHUB_OUTPUT"
-configured=$(grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
+reject env REQUESTER_TEAMS=bravo STAGE=configure RUN_KEY=42.configure.1 PARAMS_JSON='{"software":["git"]}' bash scripts/validate.sh
+validate configure '{"software":["htop"]}'
+configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
-yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -e '.configuration.software==["htop"] and .compute.size=="M" and .billing.costCenter=="CC-123"'
-# Software refry is additive: an empty selection keeps the recorded list, a new one is appended.
-SOFTWARE_INPUT='[]' STAGE=software bash scripts/validate.sh existing
-grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- | jq -e '.configuration.software==["htop"]'
-SOFTWARE_INPUT='["git","htop"]' STAGE=software bash scripts/validate.sh existing
-grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- | jq -e '.configuration.software==["htop","git"]'
-STAGE=ad-join bash scripts/validate.sh existing
-configured=$(grep '^spec_json=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
+validate configure '{"software":[]}'
+sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT" | jq -e '.configuration.software==["htop"]'
+validate configure '{"software":["git","htop"]}'
+configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
-yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -e '.configuration.adJoin==true and .configuration.software==["htop"]'
-before=$(yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -c .)
-STATUS=ready STAGE=baseline STAGE_STATUS=success bash scripts/inventory.sh update
-ready_at=$(yq -r '.metadata.annotations."cf/ready-at"' "vms/$NAME/catalog-info.yaml")
-[[ "$ready_at" =~ ^[0-9]{4}- ]]
-STATUS=ready STAGE=software bash scripts/inventory.sh update
-yq -r '.metadata.annotations."cf/stages"' "vms/$NAME/catalog-info.yaml" | jq -e '.software=="skipped" and .baseline=="success"'
-yq -r '.metadata.annotations."cf/processes"' "vms/$NAME/catalog-info.yaml" | jq -e '.finalize=="success" and ."on-failure"=="skipped"'
-GITHUB_RUN_ID=456 STAGE=software STAGE_STATUS=success bash scripts/inventory.sh update
-[[ "$(yq -r '.metadata.annotations."cf/ready-at"' "vms/$NAME/catalog-info.yaml")" == "$ready_at" ]]
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/provision-run-id"]=="123" and (.metadata.annotations["cf/failed-at"]|length)>0'
-# Real guard script: manual allowed, stale incarnation skipped without network access.
+reject validate configure '{"software":["unknown"]}'
+reject validate configure '{"software":["git"],"adJoin":true}'
+validate configure '{"adJoin":true}'
+configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
+SPEC_JSON="$configured" bash scripts/inventory.sh configure
+entity | jq -e '.spec.configuration=={software:["htop","git"],adJoin:true} and .spec.billing.costCenter=="CC-123"'
+before_spec=$(entity | jq -c .spec)
+PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-test INSTANCE_TYPE=t3.small bash scripts/inventory.sh outputs
+REQUESTED_BY=operator validate baseline
+sed -n 's/^vars_json=//p' "$GITHUB_OUTPUT" | jq -e '.cf_requested_by=="tester" and .cf_software==["htop","git"] and .cf_team=="alpha"'
+grep -qx host=192.0.2.10 "$GITHUB_OUTPUT"
+OUTCOME=ready bash scripts/inventory.sh finalize
+entity | jq -e '.metadata.annotations["cf/status"]=="ready" and (.metadata.annotations["cf/ready-at"]|test("^[0-9]{4}-")) and (.metadata.annotations|has("cf/failed-at")|not)'
+# Seed distinguishable old times to prove first-time semantics without sleeping.
+yq -i '.metadata.annotations."cf/ready-at" = "2000-01-01T00:00:00Z"' "$file"
+OUTCOME=ready bash scripts/inventory.sh finalize
+OUTCOME=failed bash scripts/inventory.sh finalize
+entity | jq -e '.metadata.annotations["cf/status"]=="failed" and (.metadata.annotations["cf/failed-at"]|test("^[0-9]{4}-"))'
+yq -i '.metadata.annotations."cf/failed-at" = "2001-01-01T00:00:00Z"' "$file"
+GITHUB_RUN_ID=456 OUTCOME=failed bash scripts/inventory.sh finalize
+OUTCOME=ready bash scripts/inventory.sh finalize
+entity | jq -e '.metadata.annotations as $a | $a["cf/ready-at"]=="2000-01-01T00:00:00Z" and $a["cf/failed-at"]=="2001-01-01T00:00:00Z" and $a["cf/requested-by"]=="tester" and $a["cf/request-id"]=="request-123" and (["cf/stages","cf/processes","cf/provision-run-id"] | all(. as $k | $a | has($k) | not))'
+[[ "$(entity | jq -c .spec)" == "$before_spec" ]]
 bash scripts/demo-guard.sh
-tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=true'
+tail -1 "$GITHUB_OUTPUT" | grep -qx proceed=true
 DEMO_GENERATION=stale EXPECTED_REQUEST_ID=different bash scripts/demo-guard.sh
-tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=false'
-yq -o=json '.' "vms/$NAME/catalog-info.yaml" | jq -e '.metadata.annotations["cf/run-id"]=="456"'
-after=$(yq -o=json '.spec' "vms/$NAME/catalog-info.yaml" | jq -c .)
-[[ "$before" == "$after" ]] || { echo 'Status update mutated desired configuration' >&2; exit 1; }
+tail -1 "$GITHUB_OUTPUT" | grep -qx proceed=false
+REQUEST_ID=different validate destroy '{"demoGeneration":"12345678-1234-1234-1234-123456789abc"}'
+grep -qx noop=true "$GITHUB_OUTPUT"
 bash scripts/inventory.sh delete
 test ! -d "vms/$NAME"
-DEMO_GENERATION=stale EXPECTED_REQUEST_ID=manual:123 bash scripts/demo-guard.sh
-tail -1 "$GITHUB_OUTPUT" | grep -qx 'proceed=false'
+validate destroy
+grep -qx noop=true "$GITHUB_OUTPUT"
+validate finalize '{"outcome":"failed"}'
+grep -qx noop=true "$GITHUB_OUTPUT"
+bash scripts/terraform.sh destroy
+bash scripts/inventory.sh delete
+OUTCOME=failed bash scripts/inventory.sh finalize
+DEMO_GENERATION=stale EXPECTED_REQUEST_ID=request-123 bash scripts/demo-guard.sh
+tail -1 "$GITHUB_OUTPUT" | grep -qx proceed=false
 test -f vms/.gitkeep
 test -f vms/other-vm/catalog-info.yaml
-# Advanced picker: an explicit instance type replaces size; exactly one of the two is accepted.
+
+# Keep the existing spec-boundary integration checks, without adding a test framework.
 advanced='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","instanceType":"m7i.large"}}'
 python3 scripts/spec.py <<< "$advanced" | jq -e '.compute.instanceType=="m7i.large" and (.compute|has("size")|not)'
-if python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"cloudTags":{"Cost_Center":"x"}}' 2>/dev/null; then
-  echo 'Reserved cost_center tag accepted' >&2; exit 1
-fi
+reject python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"cloudTags":{"Cost_Center":"x"}}'
 for bad in '"size":"S","instanceType":"t3.small"' '"size":"XL"' '"instanceType":"mac2.metal"' '"instanceType":"m7i large"'; do
-  if python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{\"platform\":\"aws\",\"os\":\"ubuntu\",$bad}}" 2>/dev/null; then
-    echo "Invalid compute accepted: $bad" >&2; exit 1
-  fi
+  reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{\"platform\":\"aws\",\"os\":\"ubuntu\",$bad}}"
 done
 python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"XS"}}' | jq -e '.compute.size=="XS"'
-echo 'Offline workflow-helper integration tests passed'
+echo 'Offline workflow-helper integration checks passed'

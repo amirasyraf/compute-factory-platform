@@ -39,34 +39,15 @@ spec:
             enum: [git, htop, nginx, docker]
           ui:widget: checkboxes
   steps:
-    - id: vm
-      name: Authorize VM lookup as initiating user
-      action: catalog:fetch
-      input:
-        entityRef: ${{ parameters.vm }}
-    - id: dispatch
-      name: Start fry pipeline
-      action: github:actions:dispatch
-      input:
-        repoUrl: github.com?owner=amirasyraf&repo=compute-factory-platform
-        workflowId: fry.yml
-        branchOrTagName: main
-        returnWorkflowRunDetails: true
-        workflowInputs:
-          name: ${{ steps.vm.output.entity.metadata.name }}
-          stage: ${{ parameters.stage }}
-          software: ${{ parameters.software | dump }}
-          requested_by: ${{ user.entity.metadata.name }}
-          requester_teams: ${{ user.entity.spec.memberOf | join(',') }}
-    - id: monitor
-      name: Monitor fry workflow
-      action: cf:watch-workflow
+    - id: run
+      name: Start refry run
+      action: cf:vm:run
       input:
         operation: refry
-        workflowRunId: ${{ steps.dispatch.output.workflowRunId }}
+        vm: ${{ parameters.vm }}
+        stage: ${{ parameters.stage }}
+        software: ${{ parameters.software }}
   output:
     links:
-      - title: Open VM in catalog
-        entityRef: ${{ parameters.vm }}
-      - title: Pipeline run
-        url: ${{ steps.dispatch.output.workflowRunHtmlUrl }}
+      - title: Follow run
+        url: ${{ steps.run.output.runUrl }}

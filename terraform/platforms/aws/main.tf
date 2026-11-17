@@ -11,7 +11,7 @@ terraform {
 
 provider "aws" {
   default_tags {
-    tags = merge(var.cloud_tags, {
+    tags = merge(var.cloud_tags, var.request_id == "" ? {} : { "cf:request-id" = var.request_id }, {
       "cf:poc"  = "true"
       "cf:vm"   = var.name
       "cf:team" = var.team
@@ -81,6 +81,10 @@ resource "aws_security_group" "vm" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = { Name = "cf-${var.name}" }
+  lifecycle {
+    # Imported groups already have a generated name; never replace them for a suffix.
+    ignore_changes = [name_prefix]
+  }
 }
 
 resource "aws_instance" "vm" {
@@ -103,6 +107,8 @@ resource "aws_instance" "vm" {
     "cf:requested-by" = var.requested_by
   }
   lifecycle {
+    # These creation-time choices may change between retries (new bake/default subnet).
+    ignore_changes = [ami, subnet_id]
     precondition {
       condition     = contains(data.aws_ec2_instance_type.selected.supported_architectures, "x86_64")
       error_message = "${local.instance_type} cannot boot the x86_64 golden image."

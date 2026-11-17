@@ -49,6 +49,12 @@ variable "requested_by" {
   description = "Initiating Backstage user."
 }
 
+variable "request_id" {
+  type        = string
+  default     = ""
+  description = "VM incarnation; used to adopt resources after interrupted state writes."
+}
+
 variable "cloud_tags" {
   type        = map(string)
   default     = {}

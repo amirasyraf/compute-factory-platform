@@ -1,49 +1,74 @@
 # Compute Factory platform
 
-POC VM provisioning on AWS, with Git as inventory and isolated Ansible fry jobs.
-The binding cross-repository interfaces are in the sibling `compute-factory/CONTRACTS.md`.
+POC AWS VM stage executor, with Git as inventory and Ansible configuration.
+The binding cross-repository interfaces are in `../compute-factory/CONTRACTS.md`.
 
 ## Lifecycle
 
-`provision.yml`: validate → register → Terraform → baseline → optional software → optional
-mock AD join → access → ready. Every inventory transition is committed to `main`; the catalog entity
-records both the five user-facing `cf/stages` and the complete nine-job `cf/processes` graph. Running
-processes are marked failed if a job fails. Failed VMs remain available for diagnosis.
+The IDP `vms` backend owns stage ordering, automatic retries/backoff, manual retry/skip,
+and run state in its database. GitHub Actions **executes exactly one stage per dispatch**
+through `.github/workflows/stage.yml`. There is no supported direct lifecycle pipeline.
 
-`fry.yml` re-runs one fry stage using the host and SSH user in the VM entity. Before applying,
-software refry adds the selected packages to `spec.configuration.software` (an empty selection keeps
-the list); AD refry sets `spec.configuration.adJoin=true`. Other desired settings and original
-requester provenance are preserved. Software installs are additive and nothing is uninstalled, so the
-recorded list only grows.
-`destroy.yml` checks ownership, marks destroying, destroys the VM, deletes its S3 state object,
-then removes `vms/<name>/`. The VM catalog entity is subsequently orphaned and deleted.
+Provision runs execute register → provision → baseline → optional software → optional mock
+AD join → access → finalize. Refry runs configure the desired state (software/AD only), execute
+one fry stage, then finalize. Destroy runs remove infrastructure/state/inventory; only their
+failure path finalizes. The IDP handles inapplicable-stage skips, not GitHub Actions.
+Transient failures do not mark the VM failed: only the orchestrator's terminal `finalize`
+with `outcome: failed` writes that status. Failed VMs remain for diagnosis.
 
-All three entry points share concurrency group `vm-<name>`, so operations on the same VM
-are serialized. Distinct VMs can run concurrently. Inventory commits retry pull/rebase/push
-five times, using rebase autostash to preserve unrelated working-tree changes. Backstage refresh
-is best-effort and bounded to ten seconds per entity.
-`vms/.gitkeep` is permanent; each registered VM has only `catalog-info.yaml`. The portal
-request task and VM page both read this catalog projection, while the request, refry and destroy tasks
-stream their GitHub Actions jobs and steps directly. Users can see validation, registration, Terraform,
-every fry job, finalization, deletion and failure handling without repository access.
+Each dispatch supplies `stage`, `name`, `request_id`, `run_key`, `requested_by`,
+`requester_teams` and optional `params_json` (object, at most 40 KiB). The run title is
+`stage <stage> <name> by <requested_by> [<run_key>]`; the suffix is dispatch recovery identity.
+`run_key` is `<positive run id>.<stage>.<positive attempt>`, `request_id` is a stable incarnation
+matching `^[a-zA-Z0-9_-]{1,100}$`, and names match `^[a-z][a-z0-9-]{2,20}$`.
+
+One 20-minute job checks out the dispatched commit (`github.sha`). Its `Validate inputs` step
+does all local input/spec/identity/team checks before mutations. Failure there is permanent;
+tool setup, OIDC, cleanup-check HTTP, AWS, SSH and Git writes happen later and are retryable.
+Concurrency `vm-<name>` serializes all attempts for a VM. Distinct VMs run concurrently.
+The workflow has only `contents: write` and `id-token: write` permissions.
+
+| Stage | `params_json` | Effect |
+|---|---|---|
+| register | `{"spec": <Resource spec>}` | Create inventory with `provisioning`; same incarnation is a no-op, another is rejected |
+| provision | `{}` | Mark provisioning, adopt/apply Terraform, record outputs, mark frying |
+| baseline/software/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
+| configure | `{"software":["git"]}` **or** `{"adJoin":true}` | Persist software union or enable AD join, without VM contact |
+| destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state and inventory |
+| finalize | `{"outcome":"ready"}` or `{"outcome":"failed"}` | Write status and first-only readiness/failure timestamp |
+
+Missing inventory makes destroy/finalize successful no-ops. Finalize for another incarnation,
+or automatic cleanup for an outdated incarnation, also does nothing. Other stages reject a
+missing/mismatched incarnation. Guards use persisted `spec.owner` (desired owner for register).
+`requester_teams` contains comma-separated bare group names; `platform-admins` passes all guards.
+Register retry checks both desired and existing owner. No side effects run for a validated no-op.
+
+Every inventory write commits to `main`, retries pull/rebase/push eight times with jitter and
+`--autostash`, then best-effort refreshes `resource:default/<name>` in Backstage (10-second
+HTTP timeout). Register/delete also refresh `location:default/cf-vms`. `vms/.gitkeep` remains.
+Git tracks coarse `cf/status`, connection/instance outputs and request provenance only;
+per-stage attempts and errors live in the IDP database, never inventory annotations.
+`cf/ready-at` and `cf/failed-at` record their first occurrence and are never reset by refry.
+
+## Templates and progress
+
+`vm-request` first runs `cf:servicenow:create`: a real HTTP POST to the IDP mock ServiceNow
+receiver requiring HTTP 201. Its deterministic fake RITM is task output, not VM inventory or
+workflow input; this is not an approval gate or real ticket system. Then `cf:vm:dispatch`
+submits `{name, specJson}` to `/api/vms/requests`; authenticated identity, teams and the task ID
+are derived server-side. Admission reserves quota and creates the run idempotently by task ID.
+The task ends with **Follow provisioning** (`runUrl`) and **Open VM in catalog** links.
+
+`vm-refry` and `vm-destroy` each have one `cf:vm:run` step. The action reads the chosen VM with
+initiating-user credentials and derives identity/teams server-side. Their **Follow run** link
+uses `runUrl`. Both actions return `{runId, runUrl}`. Live progress, retry and skip are on
+`/vms/runs/<id>` and the VM entity page, not streamed into the Scaffolder task. The request team
+picker remains `MyGroupsPicker`; refry/destroy retain team-filtered Resource/VM EntityPickers.
 
 ## Configuration and trust
 
-### One desired-configuration source
-
-Before dispatch, the VM request template runs `cf:servicenow:create` in the IDP backend. It POSTs
-VM name/team/compute and authenticated requester/task identity to the IDP's mock ServiceNow REST
-endpoint, which returns HTTP 201 and a fake `RITM…` number. This is a stateless integration demo, not
-a real ServiceNow ticket or approval gate. Failure stops dispatch; the number appears in task logs
-and successful task output only, not VM inventory or GHA inputs. Refry/destroy and direct workflow
-dispatch are unchanged. The matching backend action must be available before using this template.
-
-The request template uses `cf:vm:dispatch` to reserve quota in the IDP before dispatching
-`name`, `spec_json`, `requested_by`, `requester_teams` and the stable `request_id` (task ID).
-`spec_json` is a JSON Resource spec; identity/group claims remain server-supplied authorization
-context, not user-editable desired state. Validation normalizes the owner to `group:default/<team>`
-and commits the spec in `vms/<name>/catalog-info.yaml`. There is no separate `request.yaml`, and no
-duplicated desired `cf/platform`, `cf/os`, `cf/size`, `cf/team` or `cf/software` annotations.
+`catalog-info.yaml` is the only per-VM desired state; no `request.yaml` or duplicate desired
+annotations. A normalized spec looks like:
 
 ```yaml
 spec:
@@ -56,124 +81,115 @@ spec:
   cloudTags: {environment: test}
 ```
 
-Terraform reads this persisted spec and generates a private, temporary `.tfvars.json` file, deleted on
-exit. Downstream Ansible inputs and optional-job decisions also derive from the entity after
-provisioning, not the initial dispatch environment. Existing-operation guards derive the team from
-`spec.owner`. Annotations contain observed state (status, stages, IP, instance ID, current run) and
-request provenance (`cf/requested-by`, `cf/requested-at`). Status writes do not change desired spec.
+`scripts/spec.py` validates/normalizes types, supported fields and bounds with the Python standard
+library. Only AWS/Ubuntu and catalog software `[git, htop, nginx, docker]` are supported. Compute
+has exactly one of `size` (XS/S/M/L from `terraform/platforms/aws/sizes.json`) or `instanceType`
+(e.g. `m7i.large`, no `mac*`). Terraform checks x86_64 support and default-subnet AZ availability.
+The IDP Advanced picker reads the same map and live AWS offerings. Recorded `cf/instance-type`
+is the launched type, not a re-evaluation of a mutable size map.
 
-`scripts/spec.py` validates types and supported fields at workflow boundaries (Python 3 standard
-library). It rejects unsupported compute/software, unknown section fields, malformed owner refs,
-string booleans, duplicate software, control characters, more than 40 custom tags, and reserved tag
-keys (`Name`, `cost_center`, `project_code`, `cf:`, `aws:`, `billing:`; case-insensitive). Custom tag
-keys are 1–128 characters; values are strings up to 256 characters. Billing keys are `costCenter` and
-`projectCode`, nonempty strings up to 256 characters, mapped to AWS `cost_center`/`project_code` tags.
-The request form and IDP require both for new VMs; `spec.py` accepts specs without them (older VMs). These are self-reported metadata, not validated organizational billing authorization.
-Mandatory POC/ownership tags remain platform-controlled. No secrets belong in catalog specs or tags.
-Optional configuration defaults to no software/no AD join; billing and tags default to empty objects.
+Configuration defaults to no software/no AD join; billing/tags default to empty objects. Software
+refry is additive and never uninstalls. Status writes never alter desired spec or original
+`cf/requested-by`/`cf/requested-at`/`cf/request-id`. Ansible `cf_requested_by` and AWS requester
+tags come from original persisted provenance, not whoever dispatched the current attempt.
 
-This is an extensible, explicitly validated contract, not a catch-all for arbitrary unvalidated input.
-Add future enterprise sections with validators, consumers and documentation. Backstage stores custom
-spec fields but does not itself enforce this custom workflow schema. No Git push reconciliation is
-introduced: editing the file alone neither triggers Terraform nor changes the running VM. A future
-update/reconcile workflow is separate work. Legacy inventory is not migrated; rollout starts from an
-empty VM inventory after the requested VM teardown.
+Billing accepts only nonempty `costCenter`/`projectCode` (up to 256 chars), projected as
+`cost_center`/`project_code` AWS tags. Both are required by the form/IDP for new requests but
+optional in `spec.py` for older specs. These are self-reported, not billing authorization.
+Custom tags: at most 40 entries, keys 1–128 chars, string values 0–256 chars. Controls, unknown
+spec section fields and reserved tag keys/prefixes (`Name`, `cost_center`, `project_code`,
+`cf:`, `aws:`, `billing:`, case-insensitive) are rejected. Never store secrets in specs or tags.
+
+Backstage stores custom spec fields but does not itself enforce this workflow schema. Git edits
+do not trigger reconciliation or Terraform. Future enterprise sections need explicit validators
+and consumers. Legacy inventory is not migrated; coordinated cut-over starts with empty inventory.
 
 Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`
-(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN` (catalog plus the
-read-only demo cleanup check; subject `compute-factory-workflows`). Missing Backstage configuration
-skips catalog refresh without affecting provisioning; automatic demo destruction fails closed.
-AWS access always uses OIDC, never static keys. Terraform uses partial S3 backend configuration
-and native lockfiles, with state `vms/aws/<name>/terraform.tfstate`.
-Provider checksums cover macOS arm64 and Linux amd64; workflow init uses
-`-lockfile=readonly` so initialization cannot dirty tracked files before inventory rebasing.
+(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN`, subject
+`compute-factory-workflows`, restricted to catalog and the `vms` read-only cleanup check.
+Missing Backstage config skips refresh but automatic cleanup fails closed.
+The IDP must register the optional `cf-vms` glob Location and enable orphan deletion.
+Repo writers and dispatch-token holders can impersonate identity inputs: trusted POC admins only.
 
-Requirements: default VPC/subnets, golden AMI tagged `cf:managed=true` and `cf:os=ubuntu`,
-and Secrets Manager `compute-factory/ssh-ca`. All created resources are tagged `cf:poc=true`.
-The SG exposes SSH publicly for this POC. There are no EC2 key pairs. Each fry job signs an
-ephemeral key for `cf-automation` with a one-hour certificate, then immediately deletes the
-CA private-key file. Runner identities and temporary variables are removed even on failure.
+## Terraform retry safety
 
-Teams and requester membership accept bare names or catalog refs (`group:default/alpha`).
-The workflow normalizes both, checks membership, and lets `platform-admins` manage any VM.
-Backstage supplies requester identity and groups server-side, not as editable form fields.
-Anyone with repository write or dispatch-token access can impersonate these inputs; that is
-the explicit POC trust boundary. Do not grant that access to ordinary portal users.
+S3 state is `vms/aws/<name>/terraform.tfstate`, with native `use_lockfile=true`. The script uses
+`init -lockfile=readonly` so provider checksum files do not dirty inventory rebases. All resources
+carry `cf:poc=true`, `cf:vm`, `cf:team`, and (when nonempty) `cf:request-id` tags.
 
-Backstage templates use stock `MyGroupsPicker` for the user's own groups (including sole-group
-auto-selection), and VM `EntityPicker` plus `catalog:fetch` with initiator credentials. The
-browser run link uses dispatch output `workflowRunHtmlUrl`. Verify these fields, permission
-filtering, checkbox rendering, boolean-to-string serialization and catalog discovery when the
-IDP is live. The IDP must enable orphan deletion and register the `cf-vms` Location glob.
+Before either apply or destroy, recover any **untracked** instance/security group with matching
+`cf:vm`, `cf:request-id` and `cf:poc=true` into Terraform state. Instance lookup includes pending,
+running, stopping and stopped states. Zero matches permits creation (apply); one is imported;
+multiple matches fail for operator recovery rather than guessing. Security-group adoption also
+recovers an interrupted apply before instance creation. This does not adopt another incarnation.
 
-## Manual dispatch
+Instances ignore AMI and computed subnet changes after creation: a newer bake or reordering/default
+subnet availability must not replace an existing VM on retry. Imported SGs ignore `name_prefix`.
+Provision creates a saved plan and rejects any delete/replacement action before applying it, so
+other unexpected immutable-property drift requires operator recovery rather than recreation.
+Do not use direct Git edits for resize/network changes; this POC has no reconciliation flow.
 
-### Automatic demo cleanup
+The script lists the exact `.tflock` object and reads its `Created`/`ID`. A lock older than
+1,200 seconds (the workflow job timeout) is logged and removed via `terraform force-unlock`;
+a younger lock fails safely for retry. Auth/network/malformed-lock errors fail, never bypass locking.
+This relies on the shared per-VM concurrency group: external Terraform operators must not run
+against an active VM stage or rely on locks beyond that window. Local teardown freezes workflows
+first. Untracked-resource discovery, import and stale-lock recovery are script behavior, not
+properties of invoking the module directly.
 
-The IDP's admin-toggleable demo policy is defined in `compute-factory/CONTRACTS.md` §8.1.
-Registration records immutable `cf/request-id` and `cf/provision-run-id`; `cf/ready-at` and
-`cf/failed-at` record first readiness/failure and are not reset by refry. Manual provision defaults
-the request ID to `manual:<run-id>`. Old inventory without these annotations is handled conservatively
-by the controller using its original request timestamp/first observed readiness.
+Terraform receives private temporary vars and plan files, removed on exit. Only `name` is required
+by the module; `terraform destroy -var name=<name>` remains valid for `./poc down`. Stage destruction
+uses the full persisted vars, deletes the state object only after successful destroy, then removes
+inventory. Missing state after partial destruction is recovered by the same adoption path.
+AWS access is OIDC only. Requirements: default VPC/subnets, a golden AMI tagged `cf:managed=true`
+and `cf:os=ubuntu`, and Secrets Manager `compute-factory/ssh-ca`. SSH ingress is public for this POC.
 
-Automatic `destroy.yml` dispatch includes `demo_generation` and `expected_request_id`. The real
-guard script checks both VM incarnation and current backend eligibility twice, skipping stale/missing
-VMs and refusing deletion on network/auth failures. The second check immediately precedes destructive
-inventory/Terraform work, after tool setup. Manual destroy omits these fields and remains unchanged.
-Workflows remain serialized per VM. The IDP must be reachable for automatic cleanup; runner queues
-and Terraform mean expiry is a trigger time, not a guaranteed completed termination time.
+## SSH and demo cleanup
 
-### Trusted operator dispatch
+Each fry attempt signs a throwaway key with principal `cf-automation`, key ID `gha-<run-id>`,
+validity one hour. The CA private-key file is deleted immediately after signing; ephemeral keys,
+certs and vars are removed by an always-run step. No EC2 key pairs or per-VM user keys are stored.
+The playbook CLI/variable contract is in `ansible/README.md` and the shared contract §6.3.
+
+Automatic destroy's `demoGeneration` checks
+`GET $BACKSTAGE_URL/api/vms/cleanup-check/<name>?generation=…&request_id=…` after validation
+and again after tool setup immediately before destructive work. Ineligible returns a successful
+no-op; HTTP/auth/network or malformed responses fail closed and remain retryable. Manual destroy
+uses `{}` and never contacts this endpoint. Demo expiry is a trigger time, not a termination SLA.
+
+Trusted manual dispatch can execute **one** stage and is not tracked by the orchestrator:
 
 ```bash
-gh workflow run provision.yml -R amirasyraf/compute-factory-platform \
-  -f name=demo-1 \
-  -f 'spec_json={"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"configuration":{"software":["git","nginx"],"adJoin":false}}' \
-  -f requested_by=amirasyraf -f requester_teams=alpha
-
-gh workflow run fry.yml -R amirasyraf/compute-factory-platform \
-  -f name=demo-1 -f stage=software -f 'software=["htop"]' \
-  -f requested_by=amirasyraf -f requester_teams=alpha
-
-gh workflow run destroy.yml -R amirasyraf/compute-factory-platform \
-  -f name=demo-1 -f requested_by=amirasyraf -f requester_teams=alpha
+gh workflow run stage.yml -R amirasyraf/compute-factory-platform \
+  -f stage=baseline -f name=demo-1 -f request_id='persisted-request-id' \
+  -f run_key=42.baseline.1 -f requested_by=amirasyraf -f requester_teams=alpha \
+  -f 'params_json={}'
 ```
 
-Run `gh run watch <id> --exit-status` in background mode when operating through an agent.
-Do not run teardown against unrelated resources. Shared infra and golden-image lifecycle
-belong to `compute-factory` / `compute-factory-builder`, not this repository.
+Do not dispatch this during coordinated cut-over until the matching IDP is deployed. Do not run
+teardown against unrelated resources; shared infra and golden images belong to sibling repos.
 
-## Extending the POC
+## Extending and checking
 
-- **Platform:** add `terraform/platforms/<platform>/` with the same variables (`name`, `os`,
-  `size`, `team`, `requested_by`, `cloud_tags`) and outputs (`public_ip`, `ssh_user`, `instance_id`,
-  `instance_type`), plus a platform size map. For AWS the map is `terraform/platforms/aws/sizes.json`
-  (`XS`/`S`/`M`/`L` to `t3.micro`/`small`/`medium`/`large`), read by `scripts/spec.py`, Terraform and the
-  IDP request form. A spec carries exactly one of `compute.size` or `compute.instanceType` (an explicit
-  EC2 type from the IDP's Advanced picker; Terraform's `instance_type` variable). Terraform checks that
-  the type boots x86_64 and launches into a default subnet whose AZ offers it; provisioning records the
-  launched type in the `cf/instance-type` annotation. Only `name` is required, so lifecycle teardown can destroy with just
-  `-var name=<name>`. Add the platform's OIDC authentication, spec validation and template enum.
-- **OS:** bake its golden image with the matching `cf:os` tag, add the SSH-user map entry,
-  Ansible OS-family tasks, software compatibility validation and template enum. Ubuntu maps
-  to the catalog's `linux` package IDs. Update the registration SSH-user mapping as needed.
-- **Fry stage:** add `ansible/fry/<stage>.yml` and its role; add its ordered stage key to
-  inventory, validation, the reusable workflow allowlist, the provision job sequence, and
-  the refry enum. Pass the same complete `vars_json` contract to every stage.
+New platforms need the same variables (`name`, `os`, `size`, `instance_type`, `team`,
+`requested_by`, `request_id`, `cloud_tags`), outputs (`public_ip`, `ssh_user`, `instance_id`,
+`instance_type`), validator/identity/adoption rules and OIDC setup. New OSes need a golden image,
+SSH-user mapping, Ansible OS-family tasks and software checks. New stages require contract and
+orchestrator stage-list changes as well as playbooks, workflow allowlists and template enums.
 
-## Static checks
-
-Tool versions are pinned in `mise.toml`; run `mise install`, then `mise exec --` for these commands.
+Tool versions are pinned in `mise.toml`. Offline verification (no new unit-test framework):
 
 ```bash
-terraform -chdir=terraform/platforms/aws fmt -check
-terraform -chdir=terraform/platforms/aws init -backend=false
-terraform -chdir=terraform/platforms/aws validate
-actionlint
-shellcheck scripts/*.sh
+mise exec -- terraform -chdir=terraform/platforms/aws fmt -check
+mise exec -- terraform -chdir=terraform/platforms/aws init -backend=false -lockfile=readonly
+mise exec -- terraform -chdir=terraform/platforms/aws validate
+mise exec -- actionlint
+mise exec -- shellcheck scripts/*.sh
 for script in scripts/*.sh; do bash -n "$script"; done
-bash scripts/test.sh
+mise exec -- bash scripts/test.sh
 ```
 
-Ansible files and `requirements-ansible.txt` are owned by the builder/Ansible agent; workflow
-jobs install exactly `pip install -r requirements-ansible.txt` and call its stage playbooks.
+`scripts/test.sh` uses real jq/yq/Git and an isolated local bare remote to exercise validation,
+inventory idempotency, config unions, provenance, first-time timestamps and missing-inventory
+no-ops. It does not invoke AWS/Terraform or prove live recovery behavior. Live stage/SSH/adoption
+verification belongs to the coordinated IDP cut-over; local checks do not claim that evidence.

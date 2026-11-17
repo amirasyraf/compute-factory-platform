@@ -112,7 +112,7 @@ spec:
         os: ${{ parameters.compute.os }}
         size: ${{ parameters.compute.instanceType or parameters.compute.size }}
     - id: dispatch
-      name: Start VM pipeline
+      name: Start provisioning run
       action: cf:vm:dispatch
       input:
         name: ${{ parameters.name }}
@@ -121,12 +121,6 @@ spec:
           "compute":${{ parameters.compute | dump }},"configuration":${{ parameters.configuration | dump }},
           "billing":{"costCenter":${{ parameters.tags.costCenter | dump }},"projectCode":${{ parameters.tags.projectCode | dump }}},
           "cloudTags":${{ parameters.tags.extra | default({}) | dump }}}
-    - id: monitor
-      name: Monitor VM workflow
-      action: cf:watch-workflow
-      input:
-        operation: provision
-        workflowRunId: ${{ steps.dispatch.output.workflowRunId }}
   output:
     text:
       - title: ServiceNow request (mock)
@@ -134,7 +128,7 @@ spec:
           Created **${{ steps.servicenow.output.number }}** via REST
           (HTTP ${{ steps.servicenow.output.httpStatus }}). Demo only; no real ServiceNow ticket exists.
     links:
+      - title: Follow provisioning
+        url: ${{ steps.dispatch.output.runUrl }}
       - title: Open VM in catalog
         entityRef: resource:default/${{ parameters.name }}
-      - title: Pipeline run
-        url: ${{ steps.dispatch.output.workflowRunHtmlUrl }}

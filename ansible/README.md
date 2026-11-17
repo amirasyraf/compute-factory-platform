@@ -10,7 +10,8 @@ ansible-playbook -i "$host," -u ubuntu --private-key "$key" \
 ```
 
 `vars.json` always includes `cf_vm_name`, `cf_team` (bare group name),
-`cf_requested_by`, `cf_platform`, `cf_os`, `cf_software` (a JSON list), and
+`cf_requested_by` (the original persisted `cf/requested-by`, not the stage dispatcher),
+`cf_platform`, `cf_os`, `cf_software` (a JSON list), and
 `cf_ad_domain`. There are no collection or extra environment requirements.
 Playbooks resolve roles relative to their own directory. The SSH CLI arguments
 above supply host-key settings; no Ansible configuration file is required.
@@ -21,3 +22,9 @@ join a domain. Access replaces the entire principals file, removing any former
 owning team's access. Baseline owns a marked block in the banners, preserving
 the mock AD join line when stages are re-run independently. Windows tasks fail
 explicitly until implemented.
+
+The IDP orchestrator dispatches `stage.yml` once per stage attempt. Its single fry
+execution step reads the host, SSH user and variables from committed inventory,
+marks the coarse status `frying`, and cleans up ephemeral credentials even on failure.
+Retries, optional-stage decisions and final failure/ready status belong to the IDP,
+not these playbooks.

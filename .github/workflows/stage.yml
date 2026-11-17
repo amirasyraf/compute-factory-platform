@@ -1,0 +1,120 @@
+name: VM stage
+run-name: "stage ${{ inputs.stage }} ${{ inputs.name }} by ${{ inputs.requested_by }} [${{ inputs.run_key }}]"
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        type: string
+        required: true
+      name:
+        type: string
+        required: true
+      request_id:
+        type: string
+        required: true
+      run_key:
+        type: string
+        required: true
+      requested_by:
+        type: string
+        required: true
+      requester_teams:
+        type: string
+        required: true
+      params_json:
+        type: string
+        required: false
+        default: '{}'
+concurrency:
+  group: vm-${{ inputs.name }}
+  cancel-in-progress: false
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NAME: ${{ inputs.name }}
+      STAGE: ${{ inputs.stage }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      RUN_KEY: ${{ inputs.run_key }}
+      REQUESTED_BY: ${{ inputs.requested_by }}
+      REQUESTER_TEAMS: ${{ inputs.requester_teams }}
+      PARAMS_JSON: ${{ inputs.params_json }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
+      BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Validate inputs
+        id: validate
+        run: bash scripts/validate.sh
+      - name: Register inventory
+        if: inputs.stage == 'register' && steps.validate.outputs.noop != 'true'
+        run: bash scripts/inventory.sh register
+        env:
+          SPEC_JSON: ${{ steps.validate.outputs.spec_json }}
+      - name: Persist configuration
+        if: inputs.stage == 'configure' && steps.validate.outputs.noop != 'true'
+        run: bash scripts/inventory.sh configure
+        env:
+          SPEC_JSON: ${{ steps.validate.outputs.spec_json }}
+      - name: Finalize inventory
+        if: inputs.stage == 'finalize' && steps.validate.outputs.noop != 'true'
+        run: bash scripts/inventory.sh finalize
+        env:
+          OUTCOME: ${{ steps.validate.outputs.outcome }}
+      - name: Check cleanup eligibility
+        id: cleanup
+        if: inputs.stage == 'destroy' && steps.validate.outputs.noop != 'true'
+        run: bash scripts/demo-guard.sh
+        env:
+          DEMO_GENERATION: ${{ steps.validate.outputs.demo_generation }}
+          EXPECTED_REQUEST_ID: ${{ inputs.request_id }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.validate.outputs.noop != 'true' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true') || contains(fromJSON('["baseline","software","ad-join","access"]'), inputs.stage))
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.validate.outputs.noop != 'true' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true'))
+        with:
+          terraform_version: 1.16.4
+          terraform_wrapper: false
+      - name: Provision VM
+        if: inputs.stage == 'provision' && steps.validate.outputs.noop != 'true'
+        run: bash scripts/terraform.sh apply
+      - name: Destroy VM
+        if: inputs.stage == 'destroy' && steps.validate.outputs.noop != 'true' && steps.cleanup.outputs.proceed == 'true'
+        run: |
+          bash scripts/demo-guard.sh
+          if [[ "$(tail -1 "$GITHUB_OUTPUT")" == proceed=true ]]; then
+            bash scripts/terraform.sh destroy
+          fi
+        env:
+          DEMO_GENERATION: ${{ steps.validate.outputs.demo_generation }}
+          EXPECTED_REQUEST_ID: ${{ inputs.request_id }}
+      - name: Run fry stage
+        if: contains(fromJSON('["baseline","software","ad-join","access"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
+        env:
+          HOST: ${{ steps.validate.outputs.host }}
+          SSH_USER: ${{ steps.validate.outputs.ssh_user }}
+          VARS_JSON: ${{ steps.validate.outputs.vars_json }}
+        run: |
+          STATUS=frying bash scripts/inventory.sh update
+          pip install -r requirements-ansible.txt
+          bash scripts/ssh-ca.sh "$RUNNER_TEMP/cf-key"
+          bash scripts/wait-for-ssh.sh "$HOST" "$SSH_USER" "$RUNNER_TEMP/cf-key"
+          printf '%s\n' "$VARS_JSON" > "$RUNNER_TEMP/cf-vars.json"
+          ansible-playbook -i "$HOST," -u "$SSH_USER" \
+            --private-key "$RUNNER_TEMP/cf-key" \
+            --ssh-common-args "-o CertificateFile=$RUNNER_TEMP/cf-key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            "ansible/fry/$STAGE.yml" -e "@$RUNNER_TEMP/cf-vars.json"
+      - name: Remove ephemeral identity
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cf-key" "$RUNNER_TEMP/cf-key.pub" "$RUNNER_TEMP/cf-key-cert.pub" "$RUNNER_TEMP/cf-vars.json"
