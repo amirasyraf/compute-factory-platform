@@ -6,10 +6,10 @@ metadata:
   description: ubuntu VM on aws (XS) for team teama
   annotations:
     cf/status: provisioning
-    cf/public-ip: ""
+    cf/public-ip: "16.179.182.98"
     cf/ssh-user: ubuntu
-    cf/instance-id: ""
-    cf/instance-type: ""
+    cf/instance-id: "i-02e5fc41e66e7c4ff"
+    cf/instance-type: "t3.micro"
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T06:12:41Z"
     cf/request-id: cc186ad9-705b-4aac-aab3-72b81776adb8
