@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-17T03:31:10Z"
     cf/request-id: a28a57bb-a3d6-4ae8-a1bc-82424f680150
-    cf/run-id: "44010983194"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44010983194
+    cf/run-id: "44011160284"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44011160284
 spec:
   type: vm
   owner: group:default/teama
