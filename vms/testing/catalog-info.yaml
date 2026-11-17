@@ -5,7 +5,7 @@ metadata:
   title: testing
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "3.107.113.74"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0802a005bfbe034a0"
