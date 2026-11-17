@@ -1,0 +1,36 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: meow
+  title: meow
+  description: ubuntu VM on aws (XS) for team teama
+  annotations:
+    cf/status: provisioning
+    cf/stages: '{"provision":"pending","baseline":"pending","software":"pending","ad-join":"pending","access":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"pending","fry-baseline":"pending","fry-software":"pending","fry-ad-join":"pending","fry-access":"pending","finalize":"pending","on-failure":"pending"}'
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/instance-type: ""
+    cf/requested-by: user1
+    cf/requested-at: "2026-11-17T01:40:34Z"
+    cf/run-id: "43997323904"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/43997323904
+    cf/request-id: 142b285f-3188-4561-9440-b984dbae31e4
+    cf/provision-run-id: "43997323904"
+spec:
+  type: vm
+  owner: group:default/teama
+  lifecycle: poc
+  compute:
+    platform: aws
+    os: ubuntu
+    size: XS
+  configuration:
+    software:
+      - docker
+    adJoin: true
+  billing:
+    costCenter: asda
+    projectCode: asd
+  cloudTags: {}
