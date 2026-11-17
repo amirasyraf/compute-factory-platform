@@ -5,9 +5,9 @@ metadata:
   title: jdtest
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/stages: '{"provision":"success","baseline":"success","software":"success","ad-join":"success","access":"success"}'
-    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"pending","on-failure":"pending"}'
+    cf/processes: '{"validate":"success","register":"success","provision":"success","fry-baseline":"success","fry-software":"success","fry-ad-join":"success","fry-access":"success","finalize":"success","on-failure":"skipped"}'
     cf/public-ip: "32.236.45.188"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-07614d16ef396936d"
@@ -18,6 +18,7 @@ metadata:
     cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44007239400
     cf/request-id: 5aafb64b-d5f0-4af5-af5f-faa40ef94d89
     cf/provision-run-id: "44007239400"
+    cf/ready-at: "2026-11-17T03:08:25Z"
 spec:
   type: vm
   owner: group:default/teama
