@@ -2,7 +2,7 @@
 set -euo pipefail
 # Workflow concurrency serializes this VM; unrelated VM commits rebase below.
 [[ "${NAME:?}" =~ ^[a-z][a-z0-9-]{2,20}$ ]] || exit 1
-action=${1:?register, configure, update, outputs, finalize or delete}
+action=${1:?register, configure, update, outputs, address, finalize or delete}
 inventory_root=${INVENTORY_ROOT:-.}
 file="$inventory_root/vms/$NAME/catalog-info.yaml"
 export NAME
@@ -35,9 +35,12 @@ case "$action" in
       | yq -P '.' > "$file"
     ;;
   configure)
-    configuration=$(python3 scripts/spec.py <<< "${SPEC_JSON:?}" | jq -c '.configuration')
-    export configuration
-    yq -i '.spec.configuration = (strenv(configuration) | from_json)' "$file"
+    # Modify: desired compute and configuration; every other spec section is kept.
+    normalized=$(python3 scripts/spec.py <<< "${SPEC_JSON:?}")
+    compute=$(jq -c '.compute' <<< "$normalized")
+    configuration=$(jq -c '.configuration' <<< "$normalized")
+    export compute configuration
+    yq -i '.spec.compute = (strenv(compute) | from_json) | .spec.configuration = (strenv(configuration) | from_json)' "$file"
     ;;
   update)
     [[ "${STATUS:?}" =~ ^(provisioning|frying|destroying)$ ]] || exit 1
@@ -47,6 +50,12 @@ case "$action" in
   outputs)
     export PUBLIC_IP SSH_USER INSTANCE_ID INSTANCE_TYPE
     yq -i '.metadata.annotations."cf/public-ip" = strenv(PUBLIC_IP) | .metadata.annotations."cf/ssh-user" = strenv(SSH_USER) | .metadata.annotations."cf/instance-id" = strenv(INSTANCE_ID) | .metadata.annotations."cf/instance-type" = strenv(INSTANCE_TYPE)' "$file"
+    ;;
+  address)
+    # Start and stop: a stopped instance has no public IP, and a started one gets a new one.
+    [[ -z "${PUBLIC_IP-}" || "$PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid public IP' >&2; exit 1; }
+    export PUBLIC_IP
+    yq -i '.metadata.annotations."cf/public-ip" = strenv(PUBLIC_IP)' "$file"
     ;;
   finalize)
     [[ "${OUTCOME:?}" == ready || "$OUTCOME" == failed ]] || exit 1

@@ -1,0 +1,87 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: vm-modify
+  title: Modify a VM
+  description: Change a team VM's size, software or AD join. Open it from the VM page, which fills in the current configuration.
+spec:
+  owner: group:default/platform-admins
+  presentation:
+    buttonLabels:
+      createButtonText: Apply changes
+  type: infrastructure
+  parameters:
+    - title: Desired configuration
+      description: >-
+        The form shows the VM's current configuration. Changing the size restarts the VM (its public
+        IP changes). Unchecked software is uninstalled; its data and configuration files are kept.
+      required: [vm, compute, configuration]
+      properties:
+        vm:
+          title: VM
+          type: string
+          ui:field: EntityPicker
+          ui:disabled: true
+          ui:options:
+            catalogFilter:
+              kind: Resource
+              spec.type: vm
+            defaultKind: Resource
+            allowArbitraryValues: false
+        compute:
+          title: Size
+          type: object
+          additionalProperties: false
+          required: [platform, os]
+          # Same IDP field as vm-request; prefilled with the current size or instance type.
+          ui:field: VmComputePicker
+          properties:
+            platform:
+              title: Platform
+              type: string
+              enum: [aws]
+            os:
+              title: Operating system
+              type: string
+              enum: [ubuntu]
+            size:
+              title: Size
+              type: string
+              enum: [XS, S, M, L]
+            instanceType:
+              title: Instance type
+              type: string
+              pattern: '^[a-z][a-z0-9-]*\.[a-z0-9]+$'
+        configuration:
+          title: Configuration
+          type: object
+          additionalProperties: false
+          required: [software, adJoin]
+          properties:
+            software:
+              title: Software
+              type: array
+              default: []
+              uniqueItems: true
+              items:
+                type: string
+                enum: [git, htop, nginx, docker]
+              ui:widget: checkboxes
+            adJoin:
+              title: Join AD (mock)
+              type: boolean
+              default: false
+  steps:
+    - id: run
+      name: Start modify run
+      action: cf:vm:run
+      input:
+        operation: modify
+        vm: ${{ parameters.vm }}
+        compute: ${{ parameters.compute }}
+        software: ${{ parameters.configuration.software }}
+        adJoin: ${{ parameters.configuration.adJoin }}
+  output:
+    links:
+      - title: Follow run
+        url: ${{ steps.run.output.runUrl }}

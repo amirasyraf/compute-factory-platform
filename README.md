@@ -10,9 +10,11 @@ and run state in its database. GitHub Actions **executes exactly one stage per d
 through `.github/workflows/stage.yml`. There is no supported direct lifecycle pipeline.
 
 Provision runs execute register → provision → baseline → optional software → optional mock
-AD join → access → finalize. Refry runs configure the desired state (software/AD only), execute
-one fry stage, then finalize. Destroy runs remove infrastructure/state/inventory; only their
-failure path finalizes. The IDP handles inapplicable-stage skips, not GitHub Actions.
+AD join → access → finalize. Modify runs persist the new desired compute/configuration
+(`configure`), then apply only what changed (provision for a size change, software, AD join), then
+finalize. Re-apply runs execute the fry stages again against the persisted spec. Power runs
+(start/stop/reboot) and OS-update runs are one stage each and never write `cf/status`. Destroy runs
+remove infrastructure/state/inventory; only their failure path finalizes. The IDP handles inapplicable-stage skips, not GitHub Actions.
 Transient failures do not mark the VM failed: only the orchestrator's terminal `finalize`
 with `outcome: failed` writes that status. Failed VMs remain for diagnosis.
 
@@ -38,9 +40,12 @@ The workflow has only `contents: write` and `id-token: write` permissions.
 | Stage | `params_json` | Effect |
 |---|---|---|
 | register | `{"spec": <Resource spec>}` | Create inventory with `provisioning`; same incarnation is a no-op, another is rejected |
-| provision | `{}` | Mark provisioning, adopt/apply Terraform, record outputs, mark frying |
-| baseline/software/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
-| configure | `{"software":["git"]}` **or** `{"adJoin":true}` | Persist software union or enable AD join, without VM contact |
+| provision | `{}` | Mark provisioning, adopt/apply Terraform (a size change is an in-place stop/modify/start), record outputs, mark frying |
+| baseline/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
+| software | `{}` or `{"remove":["docker"]}` | As above; also removes deselected catalog packages that are no longer desired |
+| configure | `{"compute":{…},"configuration":{"software":[…],"adJoin":bool}}` | Replace desired compute and configuration (platform/OS unchanged), without VM contact |
+| start/stop/reboot | `{}` | `scripts/power.sh` on `cf/instance-id` after checking its `cf:vm`/`cf:request-id` tags; stop clears `cf/public-ip`, start records the new one and waits for SSH, reboot waits for a new boot ID |
+| os-update | `{}` | Sign an ephemeral SSH cert, run `ansible/maintain/os-update.yml` (full upgrade, reboot only if required); `cf/status` unchanged |
 | destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state and inventory |
 | finalize | `{"outcome":"ready"}` or `{"outcome":"failed"}` | Write status and first-only readiness/failure timestamp |
 
@@ -55,7 +60,8 @@ Every inventory write commits to `main`, retries pull/rebase/push eight times wi
 HTTP timeout). Register/delete also refresh `location:default/cf-vms`. `vms/.gitkeep` remains.
 Git tracks coarse `cf/status`, connection/instance outputs and request provenance only;
 per-stage attempts and errors live in the IDP database, never inventory annotations.
-`cf/ready-at` and `cf/failed-at` record their first occurrence and are never reset by refry.
+`cf/ready-at` and `cf/failed-at` record their first occurrence and are never reset by later runs.
+Fry stages and OS updates need `cf/public-ip`: on a stopped VM (empty IP) they fail validation.
 
 ## Templates and progress
 
@@ -66,11 +72,13 @@ mock ServiceNow request, runs inside the IDP (not in this repo); its fake RITM n
 the run page, not stored in VM inventory or passed to workflows. The IDP then takes the browser to
 the run page; the task also links **Follow provisioning** (`runUrl`) and **Open VM in catalog**.
 
-`vm-refry` and `vm-destroy` each have one `cf:vm:run` step. The action reads the chosen VM with
-initiating-user credentials and derives identity/teams server-side. Their **Follow run** link
-uses `runUrl`. Both actions return `{runId, runUrl}`. Live progress, retry and skip are on
-`/vms/runs/<id>` and the VM entity page, not streamed into the Scaffolder task. The request team
-picker remains `MyGroupsPicker`; refry/destroy retain team-filtered Resource/VM EntityPickers.
+`vm-modify` has one `cf:vm:run` step (`operation: modify`, `compute`, `software`, `adJoin`). The
+IDP VM page opens it prefilled with the VM's current configuration; the VM field is read-only.
+The action reads the VM with initiating-user credentials, derives identity/teams server-side and
+returns `{runId, runUrl}` (**Follow run**). Start, stop, reboot, OS updates, re-apply and destroy
+have no templates: the VM page creates those runs directly through the IDP. Live progress, retry and
+skip are on `/vms/runs/<id>` and the VM entity page, not streamed into the Scaffolder task. The
+request team picker remains `MyGroupsPicker`.
 
 ## Configuration and trust
 
@@ -95,8 +103,9 @@ has exactly one of `size` (XS/S/M/L from `terraform/platforms/aws/sizes.json`) o
 The IDP Advanced picker reads the same map and live AWS offerings. Recorded `cf/instance-type`
 is the launched type, not a re-evaluation of a mutable size map.
 
-Configuration defaults to no software/no AD join; billing/tags default to empty objects. Software
-refry is additive and never uninstalls. Status writes never alter desired spec or original
+Configuration defaults to no software/no AD join; billing/tags default to empty objects. Modify
+replaces the software list: unchecked catalog packages are removed with `apt` `state: absent`
+(data and configuration files stay). Status writes never alter desired spec or original
 `cf/requested-by`/`cf/requested-at`/`cf/request-id`. Ansible `cf_requested_by` and AWS requester
 tags come from original persisted provenance, not whoever dispatched the current attempt.
 
@@ -134,7 +143,9 @@ Instances ignore AMI and computed subnet changes after creation: a newer bake or
 subnet availability must not replace an existing VM on retry. Imported SGs ignore `name_prefix`.
 Provision creates a saved plan and rejects any delete/replacement action before applying it, so
 other unexpected immutable-property drift requires operator recovery rather than recreation.
-Do not use direct Git edits for resize/network changes; this POC has no reconciliation flow.
+Resize through IDP **Modify** (it persists the new size, then re-runs `provision`); a changed
+instance type is an in-place update. Do not use direct Git edits for resize/network changes; this
+POC has no reconciliation flow.
 
 The script lists the exact `.tflock` object and reads its `Created`/`ID`. A lock older than
 1,200 seconds (the workflow job timeout) is logged and removed via `terraform force-unlock`;

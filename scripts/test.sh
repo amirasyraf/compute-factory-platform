@@ -73,26 +73,42 @@ printf '# unrelated local edit\n' >> ansible/software-catalog.yml
 STATUS=frying bash scripts/inventory.sh update
 test -f vms/other-vm/catalog-info.yaml
 grep -q '# unrelated local edit' ansible/software-catalog.yml
-reject env REQUESTER_TEAMS=bravo STAGE=configure RUN_KEY=42.configure.1 PARAMS_JSON='{"software":["git"]}' bash scripts/validate.sh
-validate configure '{"software":["htop"]}'
+compute_s='{"platform":"aws","os":"ubuntu","size":"S"}'
+configure_params() { jq -cn --argjson compute "$1" --argjson software "$2" --argjson ad "$3" '{compute:$compute,configuration:{software:$software,adJoin:$ad}}'; }
+reject env REQUESTER_TEAMS=bravo STAGE=configure RUN_KEY=42.configure.1 PARAMS_JSON="$(configure_params "$compute_s" '["git"]' false)" bash scripts/validate.sh
+validate configure "$(configure_params "$compute_s" '["htop","nginx"]' false)"
 configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
-validate configure '{"software":[]}'
-sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT" | jq -e '.configuration.software==["htop"]'
-validate configure '{"software":["git","htop"]}'
+# Modify replaces the software list (unchecked software is removed) and may change size.
+validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","instanceType":"t3.medium"}' '["htop","git"]' true)"
 configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
-reject validate configure '{"software":["unknown"]}'
-reject validate configure '{"software":["git"],"adJoin":true}'
-validate configure '{"adJoin":true}'
-configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
-SPEC_JSON="$configured" bash scripts/inventory.sh configure
-entity | jq -e '.spec.configuration=={software:["htop","git"],adJoin:true} and .spec.billing.costCenter=="CC-123"'
+reject validate configure "$(configure_params "$compute_s" '["unknown"]' false)"
+reject validate configure "$(configure_params '{"platform":"aws","os":"windows","size":"S"}' '[]' false)"
+reject validate configure '{"software":["git"]}'
+entity | jq -e '.spec.configuration=={software:["htop","git"],adJoin:true} and .spec.compute=={platform:"aws",os:"ubuntu",instanceType:"t3.medium"} and .spec.billing.costCenter=="CC-123"'
 before_spec=$(entity | jq -c .spec)
 PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-test INSTANCE_TYPE=t3.small bash scripts/inventory.sh outputs
 REQUESTED_BY=operator validate baseline
-sed -n 's/^vars_json=//p' "$GITHUB_OUTPUT" | jq -e '.cf_requested_by=="tester" and .cf_software==["htop","git"] and .cf_team=="alpha"'
+sed -n 's/^vars_json=//p' "$GITHUB_OUTPUT" | jq -e '.cf_requested_by=="tester" and .cf_software==["htop","git"] and .cf_software_remove==[] and .cf_ad_join==true and .cf_team=="alpha"'
 grep -qx host=192.0.2.10 "$GITHUB_OUTPUT"
+validate software '{"remove":["nginx","git"]}'
+sed -n 's/^vars_json=//p' "$GITHUB_OUTPUT" | jq -e '.cf_software_remove==["nginx"]'
+reject validate software '{"remove":["unknown"]}'
+reject validate baseline '{"remove":["nginx"]}'
+reject validate stop
+PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-0123456789abcdef0 INSTANCE_TYPE=t3.medium bash scripts/inventory.sh outputs
+validate stop
+grep -qx instance_id=i-0123456789abcdef0 "$GITHUB_OUTPUT"
+validate os-update
+grep -qx host=192.0.2.10 "$GITHUB_OUTPUT"
+PUBLIC_IP='' bash scripts/inventory.sh address
+entity | jq -e '.metadata.annotations["cf/public-ip"]==""'
+reject validate reboot
+reject env PUBLIC_IP=not-an-ip bash scripts/inventory.sh address
+PUBLIC_IP=192.0.2.11 bash scripts/inventory.sh address
+validate reboot
+grep -qx host=192.0.2.11 "$GITHUB_OUTPUT"
 # Execute pinned code from a checkout with no VM inventory, reading/writing a separate
 # current checkout. A destroy queued before registration must not become a false no-op.
 (

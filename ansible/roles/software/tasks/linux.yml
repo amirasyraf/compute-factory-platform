@@ -7,3 +7,10 @@
     cache_valid_time: 3600
     lock_timeout: 600
   when: cf_software | length > 0
+# Only catalog packages deselected by Modify; their data and configuration files are kept.
+- name: Remove deselected catalog packages
+  ansible.builtin.apt:
+    name: "{{ cf_software_remove | map('extract', cf_catalog, 'linux') | list }}"
+    state: absent
+    lock_timeout: 600
+  when: cf_software_remove | default([]) | length > 0

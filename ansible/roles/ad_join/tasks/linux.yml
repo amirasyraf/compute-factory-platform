@@ -4,11 +4,13 @@
     path: /etc/compute-factory
     state: directory
     mode: "0755"
+  when: cf_ad_join | default(true) | bool
 - name: Record mock domain join (no actual AD changes)
   ansible.builtin.copy:
     dest: /etc/compute-factory/ad-join.json
     content: "{{ {'mock': true, 'domain': cf_ad_domain, 'ou': 'OU=ComputeFactory,DC=' + (cf_ad_domain | replace('.', ',DC=')), 'timestamp': ansible_facts.date_time.iso8601} | to_nice_json }}\n"
     mode: "0644"
+  when: cf_ad_join | default(true) | bool
 - name: Mark mock join in banners
   ansible.builtin.lineinfile:
     path: "{{ item }}"
@@ -19,10 +21,26 @@
   loop:
     - /etc/motd
     - /etc/issue.net
-- name: Log mock join
+  when: cf_ad_join | default(true) | bool
+# Modify can turn AD join off: undo the mock join.
+- name: Remove mock join record
+  ansible.builtin.file:
+    path: /etc/compute-factory/ad-join.json
+    state: absent
+  when: not (cf_ad_join | default(true) | bool)
+- name: Remove mock join from banners
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: '^AD join \(MOCK\):'
+    state: absent
+  loop:
+    - /etc/motd
+    - /etc/issue.net
+  when: not (cf_ad_join | default(true) | bool)
+- name: Log mock membership change
   ansible.builtin.command:
-    argv: [logger, --tag, compute-factory, "MOCK joined {{ cf_ad_domain | upper }}"]
+    argv: [logger, --tag, compute-factory, "MOCK {{ 'joined' if cf_ad_join | default(true) | bool else 'left' }} {{ cf_ad_domain | upper }}"]
   changed_when: false
-- name: Report mock join
+- name: Report mock membership change
   ansible.builtin.debug:
-    msg: "MOCK joined {{ cf_ad_domain | upper }} (no real AD changes)"
+    msg: "MOCK {{ 'joined' if cf_ad_join | default(true) | bool else 'left' }} {{ cf_ad_domain | upper }} (no real AD changes)"

@@ -83,7 +83,7 @@ jobs:
           DEMO_GENERATION: ${{ steps.validate.outputs.demo_generation }}
           EXPECTED_REQUEST_ID: ${{ inputs.request_id }}
       - uses: aws-actions/configure-aws-credentials@v4
-        if: steps.validate.outputs.noop != 'true' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true') || contains(fromJSON('["baseline","software","ad-join","access"]'), inputs.stage))
+        if: steps.validate.outputs.noop != 'true' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true') || contains(fromJSON('["baseline","software","ad-join","access","start","stop","reboot","os-update"]'), inputs.stage))
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -105,14 +105,26 @@ jobs:
         env:
           DEMO_GENERATION: ${{ steps.validate.outputs.demo_generation }}
           EXPECTED_REQUEST_ID: ${{ inputs.request_id }}
-      - name: Run fry stage
-        if: contains(fromJSON('["baseline","software","ad-join","access"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
+      - name: Change power state
+        if: contains(fromJSON('["start","stop","reboot"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
+        env:
+          INSTANCE_ID: ${{ steps.validate.outputs.instance_id }}
+          SSH_USER: ubuntu
+        run: bash scripts/power.sh "$STAGE"
+      - name: Run playbook
+        if: contains(fromJSON('["baseline","software","ad-join","access","os-update"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
         env:
           HOST: ${{ steps.validate.outputs.host }}
           SSH_USER: ${{ steps.validate.outputs.ssh_user }}
           VARS_JSON: ${{ steps.validate.outputs.vars_json }}
         run: |
-          STATUS=frying bash scripts/inventory.sh update
+          # Fry stages apply desired configuration; OS updates are maintenance and keep cf/status.
+          playbook="ansible/fry/$STAGE.yml"
+          if [[ "$STAGE" == os-update ]]; then
+            playbook=ansible/maintain/os-update.yml
+          else
+            STATUS=frying bash scripts/inventory.sh update
+          fi
           pip install -r requirements-ansible.txt
           bash scripts/ssh-ca.sh "$RUNNER_TEMP/cf-key"
           bash scripts/wait-for-ssh.sh "$HOST" "$SSH_USER" "$RUNNER_TEMP/cf-key"
@@ -120,7 +132,7 @@ jobs:
           ansible-playbook -i "$HOST," -u "$SSH_USER" \
             --private-key "$RUNNER_TEMP/cf-key" \
             --ssh-common-args "-o CertificateFile=$RUNNER_TEMP/cf-key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-            "ansible/fry/$STAGE.yml" -e "@$RUNNER_TEMP/cf-vars.json"
+            "$playbook" -e "@$RUNNER_TEMP/cf-vars.json"
       - name: Remove ephemeral identity
         if: always()
         run: rm -f "$RUNNER_TEMP/cf-key" "$RUNNER_TEMP/cf-key.pub" "$RUNNER_TEMP/cf-key-cert.pub" "$RUNNER_TEMP/cf-vars.json"

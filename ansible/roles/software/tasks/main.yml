@@ -8,6 +8,6 @@
       - item in cf_catalog
       - cf_catalog.get(item, {}).get(cf_catalog_os) is not none
     fail_msg: "Software '{{ item }}' is unknown or unavailable for {{ cf_catalog_os }}."
-  loop: "{{ cf_software }}"
+  loop: "{{ cf_software + (cf_software_remove | default([])) }}"
 - name: Load OS-family tasks
   ansible.builtin.include_tasks: "{{ cf_catalog_os }}.yml"
