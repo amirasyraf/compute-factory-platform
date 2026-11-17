@@ -5,7 +5,7 @@ metadata:
   title: cftermchk
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "3.26.131.90"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-06afbf7a8d416373b"
