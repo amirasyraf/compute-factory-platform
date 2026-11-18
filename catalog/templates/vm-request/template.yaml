@@ -2,7 +2,7 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: vm-request
-  title: Request a VM
+  title: Launch a virtual machine
   description: A team-owned server built from a golden image, with SSH access for your team.
   # Listed on the IDP Launch page; platform and image cards come before this form (?formData=).
   tags: [product]
@@ -13,7 +13,7 @@ spec:
   owner: group:default/platform-admins
   presentation:
     buttonLabels:
-      createButtonText: Request VM
+      createButtonText: Launch
   type: infrastructure
   parameters:
     - title: VM request
