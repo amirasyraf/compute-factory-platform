@@ -149,7 +149,8 @@ Backstage stores custom spec fields but does not itself enforce this workflow sc
 do not trigger reconciliation or Terraform. Future enterprise sections need explicit validators
 and consumers. Legacy inventory is not migrated; coordinated cut-over starts with empty inventory.
 
-Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`
+Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`,
+`CF_POC_MAINTENANCE` (set to `1` by teardown to make stage jobs no-op),
 (`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
 `AZURE_SUBSCRIPTION_ID`, `AZURE_LOCATION`. Secret: `BACKSTAGE_TOKEN`, subject
 `compute-factory-workflows`, restricted to catalog and the `vms` read-only cleanup check.

@@ -33,6 +33,7 @@ permissions:
   id-token: write
 jobs:
   stage:
+    if: vars.CF_POC_MAINTENANCE != '1'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
