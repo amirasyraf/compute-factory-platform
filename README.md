@@ -1,6 +1,7 @@
 # Compute Factory platform
 
-POC VM stage executor for AWS and Azure, with Git as inventory and Ansible configuration.
+POC VM stage executor for AWS and Azure (Ubuntu 26.04, Windows Server 2025), with Git as inventory and
+Ansible configuration.
 The binding cross-repository interfaces are in `../compute-factory/CONTRACTS.md`.
 
 ## Lifecycle
@@ -24,7 +25,7 @@ Each dispatch supplies `stage`, `name`, `request_id`, `run_key`, `requested_by`,
 `run_key` is `<positive run id>.<stage>.<positive attempt>`, `request_id` is a stable incarnation
 matching `^[a-zA-Z0-9_-]{1,100}$`, and names match `^[a-z][a-z0-9-]{2,20}$`.
 
-One 20-minute job checks out executor code at the dispatched commit (`github.sha`), then
+One 20-minute job (40 for `os-update`: Windows updates) checks out executor code at the dispatched commit (`github.sha`), then
 `Load current inventory` checks out current `main` separately under `.current-inventory`.
 Workflow concurrency opens before either checkout, so a queued destroy sees registration
 committed while it was waiting, not the dispatch-time snapshot. `INVENTORY_ROOT` points all
@@ -41,12 +42,12 @@ The workflow has only `contents: write` and `id-token: write` permissions.
 |---|---|---|
 | register | `{"spec": <Resource spec>}` | Create inventory with `provisioning`; same incarnation is a no-op, another is rejected |
 | provision | `{}` | Mark provisioning, adopt/apply Terraform (a size change is an in-place stop/modify/start), record outputs, mark frying |
-| baseline/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
+| baseline/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook (Windows `access` first ensures the VM's shared password secret, `scripts/vm-password.sh`) |
 | software | `{}` or `{"remove":["docker"]}` | As above; also removes deselected catalog packages that are no longer desired |
 | configure | `{"compute":{…},"configuration":{"software":[…],"adJoin":bool}}` | Replace desired compute and configuration (platform and image unchanged), without VM contact |
 | start/stop/reboot | `{}` | `scripts/power.sh` with the platform's `terraform/platforms/<p>/power.sh`, on `cf/instance-id` after checking its `cf:vm`/`cf:request-id` tags; stop clears `cf/public-ip` (Azure deallocates), start records the current one and waits for SSH, reboot waits for a new boot ID |
-| os-update | `{}` | Sign an ephemeral SSH cert, run `ansible/maintain/os-update.yml` (full upgrade, reboot only if required); `cf/status` unchanged |
-| destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state and inventory |
+| os-update | `{}` | Sign an ephemeral SSH cert, run `ansible/maintain/os-update.yml` (Linux full upgrade, reboot only if required; Windows `win_updates`, rebooting as needed); `cf/status` unchanged |
+| destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state, this incarnation's password secret (Windows) and inventory |
 | finalize | `{"outcome":"ready"}` or `{"outcome":"failed"}` | Write status and first-only readiness/failure timestamp |
 
 Missing inventory makes destroy/finalize successful no-ops. Finalize for another incarnation,
@@ -102,8 +103,8 @@ Each platform is one directory, `terraform/platforms/<p>/` (`aws`, `azure`):
 
 | File | Purpose |
 |---|---|
-| `platform.json` | `label`; `os` (`{<os>: {label, versions, sshUser, family}}`); `instanceTypePattern`, `excludedInstanceTypePattern`, `instanceIdPattern`; `reservedTagPrefixes`, `forbiddenTagKeyCharacters`; `staticPublicIp` (address kept across stop/start and resize) |
-| `sizes.json` | XS/S/M/L → instance type (AWS `t3.*`; Azure `Standard_D2ls_v6`, `D2s_v6`, `D4ls_v6`, `D4s_v6`) |
+| `platform.json` | `label`; `os` (`{<os>: {label, versions, sshUser, family, minMemoryMiB?, rootVolumeGiB (AWS), galleryImages (Azure)}}`, `family` `linux` or `windows`); `instanceTypePattern`, `excludedInstanceTypePattern`, `instanceIdPattern`; `reservedTagPrefixes`, `forbiddenTagKeyCharacters`; `staticPublicIp` (address kept across stop/start and resize) |
+| `sizes.json` | per OS family, XS/S/M/L → instance type (AWS Linux `t3.micro`–`t3.large`, Windows `t3.medium`–`t3.2xlarge`; Azure Linux `Standard_D2ls_v6`, `D2s_v6`, `D4ls_v6`, `D4s_v6`, Windows `D2ls_v6`, `D2s_v6`, `D4s_v6`, `D8s_v6`) |
 | `*.tf` | the VM root module (same variables and outputs on every platform) |
 | `adopt.sh` | adopt untracked resources of this incarnation into state before apply/destroy |
 | `power.sh` | `vm_describe`, `vm_start`, `vm_stop`, `vm_reboot` for `scripts/power.sh` |
@@ -113,27 +114,39 @@ files; generic scripts do not name a platform. The workflow logs in to AWS for e
 CA, S3 state) and additionally to Azure (`azure/login`, OIDC; Terraform via `ARM_USE_OIDC`) when the
 validated platform is `azure`. Azure VMs live in their own resource group `cf-vm-<name>` with fixed
 resource names (`cf-<name>`), a static public IP (kept across stop/start and resize) and an NSG
-allowing SSH. Azure requires an admin key at launch; it exists only in Terraform state and the
-`access` stage disables `authorized_keys`, so only CA certificates log in.
+allowing SSH. Azure requires an admin key (Linux) or password (Windows) at launch; it exists only in
+Terraform state. The Linux `access` stage disables `authorized_keys`, so only CA certificates log in;
+Windows images never accept keys, and `access` replaces the launch password with the team's shared one.
+The VM resource is `azurerm_linux_virtual_machine` or `azurerm_windows_virtual_machine` (`count` by
+family; a `moved` block keeps pre-Windows state). Login users: `ubuntu`; Windows `Administrator` on AWS,
+`cfadmin` on Azure (Azure forbids `Administrator`).
+
+Windows needs at least `minMemoryMiB` (4096): AWS Terraform refuses smaller instance types (Azure has no
+size data in Terraform; the IDP picker enforces it there), and AWS uses `rootVolumeGiB` (50) for the
+root disk. The shared password is Secrets Manager `compute-factory/vm/<name>` (`{username, password, requestId}`,
+tags `cf:poc`, `cf:vm`, `cf:request-id`): created once per incarnation (an older incarnation's secret is
+overwritten), deleted on destroy, swept by `./poc down`; the IDP reads it for the owning team.
 
 Launch offers one choice per `os.<os>.versions` entry and stores `compute.imageVersion`. The register
 stage checks availability. Terraform uses `image_version`: AWS selects the latest managed AMI tagged
 with both the OS and the selected release; Azure selects the latest bake from the release's distinct
-gallery definition in `os.<os>.galleryImages` (`ubuntu` for 26.04). Publish bakes before advertising
-a release. Keep gallery mappings and AWS images needed by existing VMs. Legacy specs without
-`imageVersion` resolve to Ubuntu 26.04; Modify preserves the original selection and never re-images.
+gallery definition in `os.<os>.galleryImages` (`ubuntu` for 26.04, `windows-2025`). Publish bakes before
+advertising a release. Keep gallery mappings and AWS images needed by existing VMs. Legacy specs without
+`imageVersion` resolve to the OS's first listed version (Ubuntu 26.04); Modify preserves the original
+selection and never re-images.
 
 `scripts/spec.py` validates/normalizes types, supported fields and bounds with the Python standard
-library. Supported platforms/OSes are those in the platform directories; software is catalog
-`[git, htop, nginx, docker]`. Compute has exactly one of `size` (a key of the platform's `sizes.json`)
+library. Supported platforms/OSes are those in the platform directories; software is keys of
+`ansible/software-catalog.json` offered for the OS's family (`ansible/README.md`). Compute has exactly
+one of `size` (a key of the platform's `sizes.json` map for the OS family)
 or `instanceType` (the platform's pattern: e.g. `m7i.large`, no `mac*`; `Standard_D2s_v6`). AWS
 Terraform checks x86_64 support and default-subnet AZ availability. The IDP Advanced picker reads the
 same maps and live offerings (Azure with vCPU quota). Recorded `cf/instance-type` is the launched
 type, not a re-evaluation of a mutable size map.
 
 Configuration defaults to no software/no AD join; billing/tags default to empty objects. Modify
-replaces the software list: unchecked catalog packages are removed with `apt` `state: absent`
-(data and configuration files stay). Status writes never alter desired spec or original
+replaces the software list: unchecked catalog packages are removed (`apt` `state: absent`, data and
+configuration files stay; Windows `Uninstall-WinGetPackage`). Status writes never alter desired spec or original
 `cf/requested-by`/`cf/requested-at`/`cf/request-id`. Ansible `cf_requested_by` and AWS requester
 tags come from original persisted provenance, not whoever dispatched the current attempt.
 
@@ -193,9 +206,9 @@ Terraform receives private temporary vars and plan files, removed on exit. Only 
 by the module; `terraform destroy -var name=<name>` remains valid for `./poc down`. Stage destruction
 uses the full persisted vars, deletes the state object only after successful destroy, then removes
 inventory. Missing state after partial destruction is recovered by the same adoption path.
-AWS and Azure access is OIDC only. Requirements: default VPC/subnets, a golden AMI tagged
-`cf:managed=true` and `cf:os=ubuntu`, an Azure gallery version of `cf-images/cfimages/ubuntu`, and
-Secrets Manager `compute-factory/ssh-ca`. SSH ingress is public for this POC.
+AWS and Azure access is OIDC only. Requirements: default VPC/subnets, golden AMIs tagged
+`cf:managed=true` and `cf:os=<os>` (`ubuntu`, `windows`), Azure gallery versions of
+`cf-images/cfimages/ubuntu` and `windows-2025`, and Secrets Manager `compute-factory/ssh-ca`. SSH ingress is public for this POC.
 
 ## SSH and demo cleanup
 
@@ -228,7 +241,8 @@ New platforms need a directory as above with the same variables (`name`, `os`, `
 `instance_type`, `team`, `requested_by`, `request_id`, `cloud_tags`) and outputs (`public_ip`,
 `ssh_user`, `instance_id`, `instance_type`), a login step in `stage.yml`, a golden image and the
 IDP/`./poc` pieces listed in the orchestrator's DESIGN.md §8. New OSes need a golden image, an `os`
-entry in each `platform.json`, Ansible OS-family tasks and software checks. New stages require contract and
+entry in each `platform.json`, a `sizes.json` map and `ansible/connection/<family>.yml` for a new family,
+Ansible OS-family tasks and catalog columns. New stages require contract and
 orchestrator stage-list changes as well as playbooks, workflow allowlists and template enums.
 
 Tool versions are pinned in `mise.toml`. Offline verification (no new unit-test framework):
@@ -242,6 +256,10 @@ done
 mise exec -- actionlint
 mise exec -- shellcheck scripts/*.sh terraform/platforms/*/*.sh
 for script in scripts/*.sh; do bash -n "$script"; done
+ansible-galaxy collection install -r ansible/requirements.yml
+for playbook in ansible/fry/*.yml ansible/maintain/os-update.yml; do
+  ansible-playbook --syntax-check -i localhost, "$playbook"
+done
 mise exec -- bash scripts/test.sh
 ```
 

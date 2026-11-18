@@ -10,7 +10,7 @@ variable "name" {
 variable "image_version" {
   type        = string
   default     = null
-  description = "OS release to boot; null preserves Ubuntu 26.04 for legacy inventory"
+  description = "OS release to boot; null (legacy inventory) is the OS's first platform.json version"
 }
 
 variable "os" {
@@ -26,7 +26,7 @@ variable "os" {
 variable "size" {
   type        = string
   default     = "S"
-  description = "Platform-independent size; a key of sizes.json. Ignored when instance_type is set."
+  description = "Platform-independent size; a key of the OS family's map in sizes.json. Ignored when instance_type is set."
   validation {
     condition     = can(regex("^[A-Z]{1,4}$", var.size))
     error_message = "Size must be a sizes.json key such as XS, S, M or L."

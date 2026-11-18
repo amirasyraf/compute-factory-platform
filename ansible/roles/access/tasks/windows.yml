@@ -1,4 +1,23 @@
 ---
-- name: Explain unsupported Windows access stage
-  ansible.builtin.fail:
-    msg: Windows access tasks are not implemented in POC.
+- name: Validate the bare team name
+  ansible.builtin.assert:
+    that: cf_team is match('^[a-z][a-z0-9-]*$')
+    fail_msg: cf_team must be a bare group name, such as alpha.
+# The baked sshd_config already has AuthorizedKeysFile none, and sshd reads this file on every
+# login, so no sshd restart is needed (restarting it would end this Ansible session).
+- name: Replace allowed principals with the owning team
+  ansible.windows.win_copy:
+    dest: "C:\\ProgramData\\ssh\\auth_principals\\{{ ansible_user }}"
+    content: "cf-automation\nteam-platform-admins\nteam-{{ cf_team }}\n"
+- name: Require the shared login password
+  ansible.builtin.assert:
+    that: cf_admin_password | default('') | length >= 16
+    fail_msg: stage.yml passes cf_admin_password (scripts/vm-password.sh) to the Windows access stage.
+# The team's shared login for Remote Desktop, shown in the IDP; it replaces the launch password.
+- name: Set the shared login password
+  ansible.windows.win_user:
+    name: "{{ ansible_user }}"
+    password: "{{ cf_admin_password }}"
+    update_password: always
+    password_never_expires: true
+  no_log: true

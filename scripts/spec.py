@@ -5,8 +5,11 @@ import sys
 from pathlib import Path
 
 # Each platform directory's platform.json (OSes, instance-type rules, reserved tags) and sizes.json
-# (size -> instance type) are the single source of truth, also read by Terraform and the IDP.
-PLATFORMS_DIR = Path(__file__).resolve().parent.parent / "terraform/platforms"
+# (OS family -> size -> instance type) are the single source of truth, also read by Terraform and
+# the IDP. So is the software catalog (package -> per-family package ID, null = not offered).
+ROOT = Path(__file__).resolve().parent.parent
+PLATFORMS_DIR = ROOT / "terraform/platforms"
+CATALOG = ROOT / "ansible/software-catalog.json"
 
 
 def platform(name):
@@ -50,6 +53,7 @@ def normalize(spec, registering=False):
     config = platform(compute["platform"])
     if compute["os"] not in config["os"]:
         raise ValueError("Unsupported compute platform or OS")
+    family = config["os"][compute["os"]]["family"]
     if "imageVersion" in compute:
         version = text(compute["imageVersion"], 32)
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", version):
@@ -66,7 +70,7 @@ def normalize(spec, registering=False):
     # Exactly one of a platform size or an explicit instance type (advanced picker).
     if ("size" in compute) == ("instanceType" in compute):
         raise ValueError("Specify exactly one of compute.size or compute.instanceType")
-    if "size" in compute and compute["size"] not in config["sizes"]:
+    if "size" in compute and compute["size"] not in config["sizes"].get(family, {}):
         raise ValueError("Unsupported size")
     excluded = config.get("excludedInstanceTypePattern")
     if "instanceType" in compute and (
@@ -80,8 +84,9 @@ def normalize(spec, registering=False):
     software = configuration.get("software", [])
     if not isinstance(software, list) or not all(isinstance(item, str) for item in software):
         raise ValueError("software must be a string list")
-    if len(set(software)) != len(software) or any(item not in ("git", "htop", "nginx", "docker") for item in software):
-        raise ValueError("Duplicate or unsupported software")
+    catalog = json.loads(CATALOG.read_text())
+    if len(set(software)) != len(software) or any(not catalog.get(item, {}).get(family) for item in software):
+        raise ValueError(f"Duplicate software, or software not offered for {compute['os']}")
     ad_join = configuration.get("adJoin", False)
     if not isinstance(ad_join, bool):
         raise ValueError("adJoin must be a boolean")

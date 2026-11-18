@@ -11,6 +11,10 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -24,9 +28,13 @@ provider "azurerm" {
 data "azurerm_client_config" "current" {}
 
 locals {
-  sizes         = jsondecode(file("${path.module}/sizes.json"))
   platform      = jsondecode(file("${path.module}/platform.json"))
-  instance_type = var.instance_type != "" ? var.instance_type : local.sizes[var.size]
+  os            = local.platform.os[var.os]
+  windows       = local.os.family == "windows"
+  sizes         = jsondecode(file("${path.module}/sizes.json"))
+  instance_type = var.instance_type != "" ? var.instance_type : local.sizes[local.os.family][var.size]
+  # Inventory from before image versions were recorded is the OS's first (original) release.
+  image_version = coalesce(var.image_version, local.os.versions[0])
   # Every resource of one VM lives in its own resource group with fixed names, so recovery
   # (adopt.sh) and teardown find them without guessing.
   resource_group = "cf-vm-${var.name}"
@@ -37,7 +45,7 @@ locals {
     "cf:team" = var.team
   })
   # Each release has its own definition, so latest can never cross releases.
-  image_name = local.platform.os[var.os].galleryImages[coalesce(var.image_version, "26.04")]
+  image_name = local.os.galleryImages[local.image_version]
   image_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/cf-images/providers/Microsoft.Compute/galleries/cfimages/images/${local.image_name}"
 }
 
@@ -108,24 +116,41 @@ resource "azurerm_network_interface_security_group_association" "vm" {
   network_security_group_id = azurerm_network_security_group.vm.id
 }
 
-# Azure requires an admin key. Logins use the SSH CA only: the fry `access` stage turns off
-# authorized_keys, so this key (kept only in the Terraform state) cannot be used after the first fry.
+# Azure requires an admin key (Linux) or password (Windows). Logins use the SSH CA only: the fry
+# `access` stage turns off authorized_keys on Linux, and on Windows sets the password the IDP shows
+# the team (Secrets Manager compute-factory/vm/<name>), so these launch credentials stop working.
 resource "tls_private_key" "admin" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
+resource "random_password" "admin" {
+  count            = local.windows ? 1 : 0
+  length           = 24
+  min_lower        = 1
+  min_upper        = 1
+  min_numeric      = 1
+  min_special      = 1
+  override_special = "!#()*+,-.:=?@[]_{}~"
+}
+
+moved {
+  from = azurerm_linux_virtual_machine.vm
+  to   = azurerm_linux_virtual_machine.vm[0]
+}
+
 resource "azurerm_linux_virtual_machine" "vm" {
+  count                           = local.windows ? 0 : 1
   name                            = local.resource_name
   resource_group_name             = azurerm_resource_group.vm.name
   location                        = azurerm_resource_group.vm.location
   size                            = local.instance_type
-  admin_username                  = local.platform.os[var.os].sshUser
+  admin_username                  = local.os.sshUser
   disable_password_authentication = true
   network_interface_ids           = [azurerm_network_interface.vm.id]
   source_image_id                 = local.image_id
   admin_ssh_key {
-    username   = local.platform.os[var.os].sshUser
+    username   = local.os.sshUser
     public_key = tls_private_key.admin.public_key_openssh
   }
   os_disk {
@@ -136,5 +161,28 @@ resource "azurerm_linux_virtual_machine" "vm" {
   lifecycle {
     # Creation-time choices: a newer bake or a re-created key after adoption must not replace the VM.
     ignore_changes = [source_image_id, admin_ssh_key]
+  }
+}
+
+resource "azurerm_windows_virtual_machine" "vm" {
+  count               = local.windows ? 1 : 0
+  name                = local.resource_name
+  resource_group_name = azurerm_resource_group.vm.name
+  location            = azurerm_resource_group.vm.location
+  # Windows computer names are at most 15 characters; baseline sets the same name.
+  computer_name         = trimsuffix(substr(var.name, 0, 15), "-")
+  size                  = local.instance_type
+  admin_username        = local.os.sshUser
+  admin_password        = random_password.admin[0].result
+  network_interface_ids = [azurerm_network_interface.vm.id]
+  source_image_id       = local.image_id
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+  }
+  tags = merge(local.tags, { "cf:requested-by" = var.requested_by })
+  lifecycle {
+    # Creation-time choices; the access stage owns the password after launch.
+    ignore_changes = [source_image_id, admin_password]
   }
 }

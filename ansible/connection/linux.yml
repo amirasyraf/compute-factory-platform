@@ -1,0 +1,4 @@
+---
+# Connection settings for Linux hosts, passed with -e by stage.yml (the OS family is known before
+# facts are gathered). Plays do not set become themselves.
+ansible_become: true

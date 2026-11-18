@@ -67,11 +67,10 @@ if [[ "$noop" == false ]]; then
   platform_file="terraform/platforms/$PLATFORM/platform.json"
   FAMILY=$(jq -r --arg os "$OS" '.os[$os].family' "$platform_file")
   SSH_USER=$(jq -r --arg os "$OS" '.os[$os].sshUser' "$platform_file")
-  export FAMILY
   # Packages deselected by Modify; anything still desired is never removed.
   REMOVE=$(jq -c --argjson keep "$SOFTWARE" '(.remove // []) - $keep | unique' <<< "$params")
   while IFS= read -r package; do
-    supported=$(PACKAGE="$package" yq -r '.[strenv(PACKAGE)][strenv(FAMILY)] // ""' ansible/software-catalog.yml)
+    supported=$(jq -r --arg package "$package" --arg family "$FAMILY" '.[$package][$family] // ""' ansible/software-catalog.json)
     [[ -n "$supported" ]] || fail "Unsupported software for $OS: $package"
   done < <(jq -r '.[]' <<< "$SOFTWARE" && jq -r '.[]' <<< "$REMOVE")
 fi
@@ -82,6 +81,7 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "outcome=$(jq -r '.outcome // ""' <<< "$params")"
     if [[ "$noop" == false ]]; then
       echo "platform=$PLATFORM"
+      echo "family=$FAMILY"
       echo "spec_json=$SPEC_JSON"
       user=$REQUESTED_BY
       if [[ "$STAGE" != register ]]; then user=$(yq -r '.metadata.annotations."cf/requested-by"' "$file"); fi

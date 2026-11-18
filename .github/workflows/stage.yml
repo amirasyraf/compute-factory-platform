@@ -35,7 +35,8 @@ jobs:
   stage:
     if: vars.CF_POC_MAINTENANCE != '1'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Windows updates can take much longer than anything else (orchestrator stage deadline: 45 min).
+    timeout-minutes: ${{ inputs.stage == 'os-update' && 40 || 20 }}
     env:
       NAME: ${{ inputs.name }}
       STAGE: ${{ inputs.stage }}
@@ -123,12 +124,14 @@ jobs:
         env:
           INSTANCE_ID: ${{ steps.validate.outputs.instance_id }}
           PLATFORM: ${{ steps.validate.outputs.platform }}
+          FAMILY: ${{ steps.validate.outputs.family }}
           SSH_USER: ${{ steps.validate.outputs.ssh_user }}
         run: bash scripts/power.sh "$STAGE"
       - name: Run playbook
         if: contains(fromJSON('["baseline","software","ad-join","access","os-update"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
         env:
           HOST: ${{ steps.validate.outputs.host }}
+          FAMILY: ${{ steps.validate.outputs.family }}
           SSH_USER: ${{ steps.validate.outputs.ssh_user }}
           VARS_JSON: ${{ steps.validate.outputs.vars_json }}
         run: |
@@ -140,13 +143,20 @@ jobs:
             STATUS=frying bash scripts/inventory.sh update
           fi
           pip install -r requirements-ansible.txt
+          ansible-galaxy collection install -r ansible/requirements.yml
           bash scripts/ssh-ca.sh "$RUNNER_TEMP/cf-key"
           bash scripts/wait-for-ssh.sh "$HOST" "$SSH_USER" "$RUNNER_TEMP/cf-key"
           printf '%s\n' "$VARS_JSON" > "$RUNNER_TEMP/cf-vars.json"
+          # Windows access: the shared login password (created once per VM incarnation).
+          printf '{}\n' > "$RUNNER_TEMP/cf-secret.json"
+          if [[ "$FAMILY" == windows && "$STAGE" == access ]]; then
+            bash scripts/vm-password.sh ensure "$RUNNER_TEMP/cf-secret.json"
+          fi
+          # Keepalives: Windows updates restart the network adapter.
           ansible-playbook -i "$HOST," -u "$SSH_USER" \
             --private-key "$RUNNER_TEMP/cf-key" \
-            --ssh-common-args "-o CertificateFile=$RUNNER_TEMP/cf-key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-            "$playbook" -e "@$RUNNER_TEMP/cf-vars.json"
+            --ssh-common-args "-o CertificateFile=$RUNNER_TEMP/cf-key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30" \
+            "$playbook" -e "@ansible/connection/$FAMILY.yml" -e "@$RUNNER_TEMP/cf-vars.json" -e "@$RUNNER_TEMP/cf-secret.json"
       - name: Remove ephemeral identity
         if: always()
-        run: rm -f "$RUNNER_TEMP/cf-key" "$RUNNER_TEMP/cf-key.pub" "$RUNNER_TEMP/cf-key-cert.pub" "$RUNNER_TEMP/cf-vars.json"
+        run: rm -f "$RUNNER_TEMP/cf-key" "$RUNNER_TEMP/cf-key.pub" "$RUNNER_TEMP/cf-key-cert.pub" "$RUNNER_TEMP/cf-vars.json" "$RUNNER_TEMP/cf-secret.json"

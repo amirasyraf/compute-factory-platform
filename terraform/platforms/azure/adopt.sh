@@ -21,6 +21,8 @@ nsg="$base/providers/Microsoft.Network/networkSecurityGroups/$res"
 vnet="$base/providers/Microsoft.Network/virtualNetworks/$res"
 adopt() { # <address> <id> <exists: true|false>
   grep -Fqx "$1" <<< "$tracked" && return 0
+  # State from before the VM resource had a count (the moved block renames it on apply).
+  grep -Fqx "${1%\[0\]}" <<< "$tracked" && return 0
   [[ "$3" == true ]] || return 0
   echo "Adopting $1 ($2)"
   terraform -chdir="$dir" import -input=false -var-file="$vars_file" "$1" "$2"
@@ -38,4 +40,5 @@ associated=false
 if [[ "$(has "$nic")" == true && -n "$(az network nic show --ids "$nic" --query 'networkSecurityGroup.id' -o tsv)" ]]; then associated=true; fi
 adopt azurerm_network_interface_security_group_association.vm "$nic|$nsg" "$associated"
 vm="$base/providers/Microsoft.Compute/virtualMachines/$res"
-adopt azurerm_linux_virtual_machine.vm "$vm" "$(has "$vm")"
+family=$(jq -er --slurpfile vars "$vars_file" '.os[$vars[0].os].family' "$dir/platform.json")
+adopt "azurerm_${family}_virtual_machine.vm[0]" "$vm" "$(has "$vm")"

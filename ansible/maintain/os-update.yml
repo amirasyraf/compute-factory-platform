@@ -1,18 +1,7 @@
 ---
 - name: Apply OS updates
   hosts: all
-  become: true
   tasks:
-    - name: Upgrade all packages
-      ansible.builtin.apt:
-        upgrade: dist
-        update_cache: true
-        lock_timeout: 600
-    - name: Check whether the updates need a reboot
-      ansible.builtin.stat:
-        path: /var/run/reboot-required
-      register: cf_reboot_required
-    - name: Reboot to finish the updates
-      ansible.builtin.reboot:
-        reboot_timeout: 600
-      when: cf_reboot_required.stat.exists
+    - name: Load OS-family tasks
+      ansible.builtin.include_tasks:
+        file: "tasks/{{ 'windows' if ansible_facts.os_family == 'Windows' else 'linux' }}.yml"

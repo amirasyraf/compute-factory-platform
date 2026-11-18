@@ -1,0 +1,7 @@
+---
+# All categories, like the Linux full upgrade; reboots (as often as needed) only when required.
+- name: Install Windows updates
+  ansible.windows.win_updates:
+    category_names: '*'
+    reboot: true
+    reboot_timeout: 1800

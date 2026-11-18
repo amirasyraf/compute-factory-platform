@@ -7,7 +7,18 @@
         "26.04"
       ],
       "sshUser": "ubuntu",
-      "family": "linux"
+      "family": "linux",
+      "rootVolumeGiB": 16
+    },
+    "windows": {
+      "label": "Windows Server",
+      "versions": [
+        "2025"
+      ],
+      "sshUser": "Administrator",
+      "family": "windows",
+      "minMemoryMiB": 4096,
+      "rootVolumeGiB": 50
     }
   },
   "instanceTypePattern": "^[a-z][a-z0-9-]*\\.[a-z0-9]+$",

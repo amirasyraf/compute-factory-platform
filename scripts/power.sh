@@ -16,6 +16,12 @@ jq -e --arg name "${NAME:?}" --arg request "${REQUEST_ID:?}" \
   <<< "$instance" >/dev/null || { echo "Instance $INSTANCE_ID does not belong to $NAME" >&2; exit 1; }
 state=$(jq -r '.state' <<< "$instance")
 echo "Instance $INSTANCE_ID is $state"
+# Changes on every boot: the Linux boot ID, Windows' last boot time.
+case "${FAMILY:?}" in
+  linux) boot_id=(cat /proc/sys/kernel/random/boot_id) ;;
+  windows) boot_id=('(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToFileTimeUtc()') ;;
+  *) echo "Unsupported OS family $FAMILY" >&2; exit 1 ;;
+esac
 remote() {
   ssh -i "$key" -o "CertificateFile=$key-cert.pub" -o BatchMode=yes -o ConnectTimeout=5 \
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$user@$1" "${@:2}"
@@ -39,11 +45,11 @@ case "$action" in
     [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Instance has no public IP' >&2; exit 1; }
     bash scripts/ssh-ca.sh "$key"
     # The boot ID changes on every boot; an unreachable (hung) guest is still rebooted.
-    before=$(remote "$ip" cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+    before=$(remote "$ip" "${boot_id[@]}" 2>/dev/null || true)
     vm_reboot
     deadline=$((SECONDS + 600))
     sleep 15
-    until after=$(remote "$ip" cat /proc/sys/kernel/random/boot_id 2>/dev/null) && [[ -n "$after" && "$after" != "$before" ]]; do
+    until after=$(remote "$ip" "${boot_id[@]}" 2>/dev/null) && [[ -n "$after" && "$after" != "$before" ]]; do
       (( SECONDS < deadline )) || { echo 'The VM did not come back within 10 minutes' >&2; exit 1; }
       sleep 10
     done

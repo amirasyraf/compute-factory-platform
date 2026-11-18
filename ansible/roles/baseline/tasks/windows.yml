@@ -1,4 +1,37 @@
 ---
-- name: Explain unsupported Windows baseline
-  ansible.builtin.fail:
-    msg: Windows baseline tasks are not implemented in POC.
+# Windows computer names are at most 15 characters (Azure launches with the same truncation).
+- name: Set the computer name
+  ansible.windows.win_hostname:
+    name: "{{ cf_vm_name[:15] | regex_replace('-+$', '') }}"
+  register: cf_hostname
+- name: Reboot to apply the computer name
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+  when: cf_hostname.reboot_required
+- name: Set UTC timezone
+  ansible.windows.win_timezone:
+    timezone: UTC
+- name: Allow Remote Desktop logins (browser RDP connects through an SSH tunnel)
+  ansible.windows.win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server
+    name: fDenyTSConnections
+    data: 0
+    type: dword
+- name: Create VM metadata directory
+  ansible.windows.win_file:
+    path: C:\ProgramData\ComputeFactory
+    state: directory
+# The baked sshd_config shows this file as the SSH login banner.
+- name: Write login banner
+  ansible.windows.win_copy:
+    dest: C:\ProgramData\ComputeFactory\banner.txt
+    content: |
+      Compute Factory
+      VM: {{ cf_vm_name }}
+      Team: {{ cf_team }}
+      Requester: {{ cf_requested_by }}
+      Platform: {{ cf_platform }}
+- name: Record VM metadata
+  ansible.windows.win_copy:
+    dest: C:\ProgramData\ComputeFactory\vm-info.json
+    content: "{{ {'name': cf_vm_name, 'team': cf_team, 'requested_by': cf_requested_by, 'platform': cf_platform, 'os': cf_os} | to_nice_json }}\n"

@@ -1,11 +1,10 @@
 ---
 - name: Install selected software
   hosts: all
-  become: true
   pre_tasks:
     - name: Load catalog into a dedicated namespace
       ansible.builtin.include_vars:
-        file: ../software-catalog.yml
+        file: ../software-catalog.json
         name: cf_catalog
   roles:
     - role: ../roles/software

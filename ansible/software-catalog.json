@@ -1,0 +1,9 @@
+{
+  "git": { "label": "Git", "linux": "git", "windows": "Git.Git" },
+  "htop": { "label": "htop", "linux": "htop", "windows": null },
+  "nginx": { "label": "nginx", "linux": "nginx", "windows": null },
+  "docker": { "label": "Docker", "linux": "docker.io", "windows": null },
+  "vscode": { "label": "VS Code", "linux": null, "windows": "Microsoft.VisualStudioCode" },
+  "firefox": { "label": "Firefox", "linux": null, "windows": "Mozilla.Firefox" },
+  "7zip": { "label": "7-Zip", "linux": null, "windows": "7zip.7zip" }
+}

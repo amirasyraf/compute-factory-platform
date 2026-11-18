@@ -17,7 +17,7 @@ for platform in aws azure; do
   mkdir -p "terraform/platforms/$platform"
   cp "$root/terraform/platforms/$platform/"{sizes.json,platform.json} "terraform/platforms/$platform/"
 done
-cp "$root/ansible/software-catalog.yml" ansible/
+cp "$root/ansible/software-catalog.json" ansible/
 touch vms/.gitkeep
 git add .
 git commit -m fixture >/dev/null
@@ -73,10 +73,10 @@ touch "$tmp/other/vms/other-vm/catalog-info.yaml"
 git -C "$tmp/other" add .
 git -C "$tmp/other" commit -m 'another VM' >/dev/null
 git -C "$tmp/other" push >/dev/null
-printf '# unrelated local edit\n' >> ansible/software-catalog.yml
+printf '# unrelated local edit\n' >> vms/.gitkeep
 STATUS=frying bash scripts/inventory.sh update
 test -f vms/other-vm/catalog-info.yaml
-grep -q '# unrelated local edit' ansible/software-catalog.yml
+grep -q '# unrelated local edit' vms/.gitkeep
 compute_s='{"platform":"aws","os":"ubuntu","imageVersion":"26.04","size":"S"}'
 configure_params() { jq -cn --argjson compute "$1" --argjson software "$2" --argjson ad "$3" '{compute:$compute,configuration:{software:$software,adJoin:$ad}}'; }
 reject env REQUESTER_TEAMS=bravo STAGE=configure RUN_KEY=42.configure.1 PARAMS_JSON="$(configure_params "$compute_s" '["git"]' false)" bash scripts/validate.sh
@@ -88,7 +88,8 @@ validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","imageVe
 configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
 reject validate configure "$(configure_params "$compute_s" '["unknown"]' false)"
-reject validate configure "$(configure_params '{"platform":"aws","os":"windows","size":"S"}' '[]' false)"
+reject validate configure "$(configure_params '{"platform":"aws","os":"windows","imageVersion":"2025","size":"S"}' '[]' false)"
+reject validate configure "$(configure_params "$compute_s" '["vscode"]' false)"
 reject validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","imageVersion":"24.04","size":"S"}' '[]' false)"
 reject validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","size":"S"}' '[]' false)"
 reject validate configure '{"software":["git"]}'
@@ -169,7 +170,7 @@ azure='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"azure",
 python3 scripts/spec.py <<< "$azure" | jq -e '.compute.instanceType=="Standard_D2s_v6"'
 jq -c '.compute.imageVersion = "26.04"' <<< "$azure" | python3 scripts/spec.py --register | jq -e '.compute.imageVersion=="26.04"'
 reject python3 scripts/spec.py --register <<< "$(jq -c '.compute.imageVersion = "24.04"' <<< "$azure")"
-for bad in '"platform":"azure","os":"ubuntu","instanceType":"t3.small"' '"platform":"aws","os":"ubuntu","instanceType":"Standard_D2s_v6"' '"platform":"gcp","os":"ubuntu","size":"S"' '"platform":"../aws","os":"ubuntu","size":"S"' '"platform":"azure","os":"windows","size":"S"'; do
+for bad in '"platform":"azure","os":"ubuntu","instanceType":"t3.small"' '"platform":"aws","os":"ubuntu","instanceType":"Standard_D2s_v6"' '"platform":"gcp","os":"ubuntu","size":"S"' '"platform":"../aws","os":"ubuntu","size":"S"' '"platform":"azure","os":"solaris","size":"S"'; do
   reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{$bad}}"
 done
 for tag in '"azure-env":"x"' '"Microsoft.x":"x"' '"a/b":"x"'; do
@@ -187,4 +188,20 @@ grep -qx platform=azure "$GITHUB_OUTPUT"
 NAME=az-vm INSTANCE_ID=i-0123456789abcdef0 PUBLIC_IP=192.0.2.20 SSH_USER=ubuntu INSTANCE_TYPE=x bash scripts/inventory.sh outputs
 NAME=az-vm reject validate stop
 NAME=az-vm bash scripts/inventory.sh delete
+# Windows: per-family sizes and software, its own login user and OS family output.
+windows='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"windows","imageVersion":"2025","size":"XS"},"configuration":{"software":["git","vscode","firefox","7zip"],"adJoin":true}}'
+python3 scripts/spec.py --register <<< "$windows" | jq -e '.compute.size=="XS" and .configuration.software==["git","vscode","firefox","7zip"]'
+reject python3 scripts/spec.py <<< "$(jq -c '.configuration.software=["htop"]' <<< "$windows")"
+reject python3 scripts/spec.py --register <<< "$(jq -c '.compute.imageVersion="2022"' <<< "$windows")"
+jq -c '.compute.platform="azure"' <<< "$windows" | python3 scripts/spec.py --register >/dev/null
+NAME=win-vm SPEC_JSON="$(jq -c '. + {billing:{},cloudTags:{}}' <<< "$windows")" bash scripts/inventory.sh register
+yq -e '.metadata.annotations."cf/ssh-user" == "Administrator"' vms/win-vm/catalog-info.yaml >/dev/null
+NAME=win-vm PUBLIC_IP=192.0.2.30 SSH_USER=Administrator INSTANCE_ID=i-0123456789abcdef1 INSTANCE_TYPE=t3.medium bash scripts/inventory.sh outputs
+NAME=win-vm validate software '{"remove":["vscode"]}'
+grep -qx family=windows "$GITHUB_OUTPUT"
+grep -qx ssh_user=Administrator "$GITHUB_OUTPUT"
+NAME=win-vm reject validate software '{"remove":["nginx"]}'
+NAME=win-vm validate reboot
+grep -qx family=windows "$GITHUB_OUTPUT"
+NAME=win-vm bash scripts/inventory.sh delete
 echo 'Offline workflow-helper integration checks passed'

@@ -1,6 +1,5 @@
 ---
 - name: Apply VM baseline
   hosts: all
-  become: true
   roles:
     - role: ../roles/baseline

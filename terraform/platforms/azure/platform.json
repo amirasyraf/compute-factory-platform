@@ -11,6 +11,18 @@
       },
       "sshUser": "ubuntu",
       "family": "linux"
+    },
+    "windows": {
+      "label": "Windows Server",
+      "versions": [
+        "2025"
+      ],
+      "galleryImages": {
+        "2025": "windows-2025"
+      },
+      "sshUser": "cfadmin",
+      "family": "windows",
+      "minMemoryMiB": 4096
     }
   },
   "instanceTypePattern": "^Standard_[A-Za-z0-9_]{2,60}$",

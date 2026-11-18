@@ -1,6 +1,42 @@
 ---
-# Future implementation, over SSH with ansible_shell_type=powershell:
-# winget install --id {{ cf_catalog[item].windows }} --silent --accept-package-agreements --accept-source-agreements
-- name: Explain unsupported Windows software stage
-  ansible.builtin.fail:
-    msg: Windows winget software installation is not implemented in POC.
+# winget through the Microsoft.WinGet.Client module (installed for all users by the bake). The
+# winget CLI is not supported as SYSTEM or reliably over SSH; the module is, for machine-wide installs.
+- name: Install catalog packages
+  ansible.windows.win_powershell:
+    parameters:
+      Ids: "{{ cf_software | map('extract', cf_catalog, 'windows') | list }}"
+    script: |
+      param([string[]]$Ids)
+      $ErrorActionPreference = 'Stop'
+      $Ansible.Changed = $false
+      Import-Module Microsoft.WinGet.Client
+      foreach ($id in $Ids) {
+        if (Get-WinGetPackage -Id $id -MatchOption Equals | Where-Object Id -eq $id) { continue }
+        $result = Install-WinGetPackage -Id $id -MatchOption Equals -Source winget -Mode Silent -Scope SystemOrUnknown
+        if ($result.Status -ne 'Ok') { throw "winget could not install ${id}: $($result.Status) $($result.ExtendedErrorCode)" }
+        $Ansible.Changed = $true
+      }
+  become: true
+  become_method: runas
+  become_user: SYSTEM
+  when: cf_software | length > 0
+# Only catalog packages deselected by Modify.
+- name: Remove deselected catalog packages
+  ansible.windows.win_powershell:
+    parameters:
+      Ids: "{{ cf_software_remove | map('extract', cf_catalog, 'windows') | list }}"
+    script: |
+      param([string[]]$Ids)
+      $ErrorActionPreference = 'Stop'
+      $Ansible.Changed = $false
+      Import-Module Microsoft.WinGet.Client
+      foreach ($id in $Ids) {
+        if (-not (Get-WinGetPackage -Id $id -MatchOption Equals | Where-Object Id -eq $id)) { continue }
+        $result = Uninstall-WinGetPackage -Id $id -MatchOption Equals -Mode Silent
+        if ($result.Status -ne 'Ok') { throw "winget could not remove ${id}: $($result.Status) $($result.ExtendedErrorCode)" }
+        $Ansible.Changed = $true
+      }
+  become: true
+  become_method: runas
+  become_user: SYSTEM
+  when: cf_software_remove | default([]) | length > 0

@@ -1,4 +1,0 @@
-git:    { linux: git,       windows: Git.Git }
-htop:   { linux: htop,      windows: null }
-nginx:  { linux: nginx,     windows: null }
-docker: { linux: docker.io, windows: null }

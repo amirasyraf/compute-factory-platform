@@ -1,0 +1,5 @@
+---
+# Connection settings for Windows hosts (OpenSSH with PowerShell as the default shell), passed
+# with -e by stage.yml. The login user is a local administrator; tasks that must run as SYSTEM
+# set become themselves (become_method: runas).
+ansible_shell_type: powershell

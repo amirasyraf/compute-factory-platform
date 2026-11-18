@@ -1,6 +1,5 @@
 ---
 - name: Mock domain join
   hosts: all
-  become: true
   roles:
     - role: ../roles/ad_join

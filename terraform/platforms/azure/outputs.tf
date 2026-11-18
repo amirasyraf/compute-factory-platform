@@ -3,13 +3,13 @@ output "public_ip" {
 }
 
 output "ssh_user" {
-  value = local.platform.os[var.os].sshUser
+  value = local.os.sshUser
 }
 
 output "instance_id" {
-  value = azurerm_linux_virtual_machine.vm.id
+  value = one(concat(azurerm_linux_virtual_machine.vm[*].id, azurerm_windows_virtual_machine.vm[*].id))
 }
 
 output "instance_type" {
-  value = azurerm_linux_virtual_machine.vm.size
+  value = one(concat(azurerm_linux_virtual_machine.vm[*].size, azurerm_windows_virtual_machine.vm[*].size))
 }

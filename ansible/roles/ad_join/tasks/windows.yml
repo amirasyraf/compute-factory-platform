@@ -1,4 +1,28 @@
 ---
-- name: Explain unsupported Windows mock join
-  ansible.builtin.fail:
-    msg: Windows mock AD join tasks are not implemented in POC.
+- name: Record mock domain join (no actual AD changes)
+  ansible.windows.win_copy:
+    dest: C:\ProgramData\ComputeFactory\ad-join.json
+    content: "{{ {'mock': true, 'domain': cf_ad_domain, 'ou': 'OU=ComputeFactory,DC=' + (cf_ad_domain | replace('.', ',DC=')), 'timestamp': ansible_facts.date_time.iso8601} | to_nice_json }}\n"
+  when: cf_ad_join | default(true) | bool
+- name: Mark mock join in the login banner
+  ansible.windows.win_lineinfile:
+    path: C:\ProgramData\ComputeFactory\banner.txt
+    regex: '^AD join \(MOCK\):'
+    line: "AD join (MOCK): joined {{ cf_ad_domain | upper }}"
+    create: true
+  when: cf_ad_join | default(true) | bool
+# Modify can turn AD join off: undo the mock join.
+- name: Remove mock join record
+  ansible.windows.win_file:
+    path: C:\ProgramData\ComputeFactory\ad-join.json
+    state: absent
+  when: not (cf_ad_join | default(true) | bool)
+- name: Remove mock join from the login banner
+  ansible.windows.win_lineinfile:
+    path: C:\ProgramData\ComputeFactory\banner.txt
+    regex: '^AD join \(MOCK\):'
+    state: absent
+  when: not (cf_ad_join | default(true) | bool)
+- name: Report mock membership change
+  ansible.builtin.debug:
+    msg: "MOCK {{ 'joined' if cf_ad_join | default(true) | bool else 'left' }} {{ cf_ad_domain | upper }} (no real AD changes)"

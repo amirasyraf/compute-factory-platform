@@ -60,7 +60,7 @@ data "aws_ami" "golden" {
   }
   filter {
     name   = "tag:cf:os-version"
-    values = [coalesce(var.image_version, "26.04")]
+    values = [local.image_version]
   }
   filter {
     name   = "tag:cf:managed"
@@ -102,7 +102,7 @@ resource "aws_instance" "vm" {
   }
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = 16
+    volume_size           = local.os.rootVolumeGiB
     encrypted             = true
     delete_on_termination = true
   }
@@ -116,6 +116,10 @@ resource "aws_instance" "vm" {
     precondition {
       condition     = contains(data.aws_ec2_instance_type.selected.supported_architectures, "x86_64")
       error_message = "${local.instance_type} cannot boot the x86_64 golden image."
+    }
+    precondition {
+      condition     = data.aws_ec2_instance_type.selected.memory_size >= lookup(local.os, "minMemoryMiB", 0)
+      error_message = "${local.instance_type} has less memory than ${var.os} needs (${lookup(local.os, "minMemoryMiB", 0)} MiB)."
     }
     precondition {
       condition     = length(data.aws_subnets.default.ids) > 0

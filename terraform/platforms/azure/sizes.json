@@ -1,6 +1,14 @@
 {
-  "XS": "Standard_D2ls_v6",
-  "S": "Standard_D2s_v6",
-  "M": "Standard_D4ls_v6",
-  "L": "Standard_D4s_v6"
+  "linux": {
+    "XS": "Standard_D2ls_v6",
+    "S": "Standard_D2s_v6",
+    "M": "Standard_D4ls_v6",
+    "L": "Standard_D4s_v6"
+  },
+  "windows": {
+    "XS": "Standard_D2ls_v6",
+    "S": "Standard_D2s_v6",
+    "M": "Standard_D4s_v6",
+    "L": "Standard_D8s_v6"
+  }
 }

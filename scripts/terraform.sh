@@ -68,5 +68,7 @@ else
   STATUS=destroying bash scripts/inventory.sh update
   terraform -chdir="$dir" destroy -input=false -auto-approve -var-file="$vars_file"
   aws s3api delete-object --bucket "$TF_STATE_BUCKET" --key "$key"
+  # Windows VMs have a login password secret (scripts/vm-password.sh); others have none.
+  bash scripts/vm-password.sh delete
   bash scripts/inventory.sh delete
 fi
