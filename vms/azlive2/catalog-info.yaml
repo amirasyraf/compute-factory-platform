@@ -5,7 +5,7 @@ metadata:
   title: azlive2
   description: ubuntu VM on azure (XS) for team teama
   annotations:
-    cf/status: ready
+    cf/status: provisioning
     cf/public-ip: "20.213.129.37"
     cf/ssh-user: ubuntu
     cf/instance-id: "/subscriptions/74b39a79-f79d-4adb-8ae0-fe9118fc564a/resourceGroups/cf-vm-azlive2/providers/Microsoft.Compute/virtualMachines/cf-azlive2"
@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T02:26:46Z"
     cf/request-id: 1ebb7383-b68e-4af0-a25f-b8869c1f725c
-    cf/run-id: "44225668318"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44225668318
+    cf/run-id: "44225709569"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44225709569
     cf/ready-at: "2026-11-18T02:34:12Z"
 spec:
   type: vm
