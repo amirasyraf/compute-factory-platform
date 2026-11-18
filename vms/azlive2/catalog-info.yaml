@@ -13,22 +13,15 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T02:26:46Z"
     cf/request-id: 1ebb7383-b68e-4af0-a25f-b8869c1f725c
-    cf/run-id: "44224717832"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44224717832
+    cf/run-id: "44225668318"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44225668318
     cf/ready-at: "2026-11-18T02:34:12Z"
 spec:
   type: vm
   owner: group:default/teama
   lifecycle: poc
-  compute:
-    platform: azure
-    os: ubuntu
-    size: XS
-  configuration:
-    software:
-      - git
-      - nginx
-    adJoin: false
+  compute: {"platform": "azure", "os": "ubuntu", "size": "S"}
+  configuration: {"software": ["git"], "adJoin": false}
   billing:
     costCenter: CC-AZURE-1
     projectCode: P-AZURE
