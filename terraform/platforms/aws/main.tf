@@ -59,6 +59,10 @@ data "aws_ami" "golden" {
     values = [var.os]
   }
   filter {
+    name   = "tag:cf:os-version"
+    values = [coalesce(var.image_version, "26.04")]
+  }
+  filter {
     name   = "tag:cf:managed"
     values = ["true"]
   }

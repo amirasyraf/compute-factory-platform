@@ -36,8 +36,9 @@ locals {
     "cf:vm"   = var.name
     "cf:team" = var.team
   })
-  # Latest version of the OS's image definition in the infra gallery (published by the bake).
-  image_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/cf-images/providers/Microsoft.Compute/galleries/cfimages/images/${var.os}"
+  # Each release has its own definition, so latest can never cross releases.
+  image_name = local.platform.os[var.os].galleryImages[coalesce(var.image_version, "26.04")]
+  image_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/cf-images/providers/Microsoft.Compute/galleries/cfimages/images/${local.image_name}"
 }
 
 resource "azurerm_resource_group" "vm" {

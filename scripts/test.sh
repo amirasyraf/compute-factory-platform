@@ -23,7 +23,7 @@ git add .
 git commit -m fixture >/dev/null
 git push -u origin main >/dev/null
 export NAME=test-vm REQUESTER_TEAMS=alpha REQUESTED_BY=tester REQUEST_ID=request-123
-export SPEC_JSON='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"configuration":{"software":[],"adJoin":false},"billing":{"costCenter":"CC-123","projectCode":"P-1"},"cloudTags":{"environment":"test"}}'
+export SPEC_JSON='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","imageVersion":"26.04","size":"S"},"configuration":{"software":[],"adJoin":false},"billing":{"costCenter":"CC-123","projectCode":"P-1"},"cloudTags":{"environment":"test"}}'
 export GITHUB_RUN_ID=123 GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=example/platform
 export BACKSTAGE_URL='' BACKSTAGE_TOKEN='' GITHUB_OUTPUT="$tmp/outputs"
 file="vms/$NAME/catalog-info.yaml"
@@ -43,6 +43,7 @@ reject env NAME=../../escape STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$
 reject env REQUEST_ID=bad:id STAGE=register RUN_KEY=42.register.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
 reject env STAGE=register RUN_KEY=42.access.1 PARAMS_JSON="$register_params" bash scripts/validate.sh
 reject validate register '{"spec":{}}'
+reject validate register "$(jq -c '.spec.compute.imageVersion = "24.04"' <<< "$register_params")"
 reject validate provision '{"unexpected":true}'
 reject validate finalize '{"outcome":"running"}'
 reject validate destroy '{"demoGeneration":"not-a-uuid"}'
@@ -76,20 +77,22 @@ printf '# unrelated local edit\n' >> ansible/software-catalog.yml
 STATUS=frying bash scripts/inventory.sh update
 test -f vms/other-vm/catalog-info.yaml
 grep -q '# unrelated local edit' ansible/software-catalog.yml
-compute_s='{"platform":"aws","os":"ubuntu","size":"S"}'
+compute_s='{"platform":"aws","os":"ubuntu","imageVersion":"26.04","size":"S"}'
 configure_params() { jq -cn --argjson compute "$1" --argjson software "$2" --argjson ad "$3" '{compute:$compute,configuration:{software:$software,adJoin:$ad}}'; }
 reject env REQUESTER_TEAMS=bravo STAGE=configure RUN_KEY=42.configure.1 PARAMS_JSON="$(configure_params "$compute_s" '["git"]' false)" bash scripts/validate.sh
 validate configure "$(configure_params "$compute_s" '["htop","nginx"]' false)"
 configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
 # Modify replaces the software list (unchecked software is removed) and may change size.
-validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","instanceType":"t3.medium"}' '["htop","git"]' true)"
+validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","imageVersion":"26.04","instanceType":"t3.medium"}' '["htop","git"]' true)"
 configured=$(sed -n 's/^spec_json=//p' "$GITHUB_OUTPUT")
 SPEC_JSON="$configured" bash scripts/inventory.sh configure
 reject validate configure "$(configure_params "$compute_s" '["unknown"]' false)"
 reject validate configure "$(configure_params '{"platform":"aws","os":"windows","size":"S"}' '[]' false)"
+reject validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","imageVersion":"24.04","size":"S"}' '[]' false)"
+reject validate configure "$(configure_params '{"platform":"aws","os":"ubuntu","size":"S"}' '[]' false)"
 reject validate configure '{"software":["git"]}'
-entity | jq -e '.spec.configuration=={software:["htop","git"],adJoin:true} and .spec.compute=={platform:"aws",os:"ubuntu",instanceType:"t3.medium"} and .spec.billing.costCenter=="CC-123"'
+entity | jq -e '.spec.configuration=={software:["htop","git"],adJoin:true} and .spec.compute=={platform:"aws",os:"ubuntu",imageVersion:"26.04",instanceType:"t3.medium"} and .spec.billing.costCenter=="CC-123"'
 before_spec=$(entity | jq -c .spec)
 PUBLIC_IP=192.0.2.10 SSH_USER=ubuntu INSTANCE_ID=i-test INSTANCE_TYPE=t3.small bash scripts/inventory.sh outputs
 REQUESTED_BY=operator validate baseline
@@ -164,6 +167,8 @@ python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute
 # Platform-specific rules come from each platform's platform.json and sizes.json.
 azure='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"azure","os":"ubuntu","instanceType":"Standard_D2s_v6"}}'
 python3 scripts/spec.py <<< "$azure" | jq -e '.compute.instanceType=="Standard_D2s_v6"'
+jq -c '.compute.imageVersion = "26.04"' <<< "$azure" | python3 scripts/spec.py --register | jq -e '.compute.imageVersion=="26.04"'
+reject python3 scripts/spec.py --register <<< "$(jq -c '.compute.imageVersion = "24.04"' <<< "$azure")"
 for bad in '"platform":"azure","os":"ubuntu","instanceType":"t3.small"' '"platform":"aws","os":"ubuntu","instanceType":"Standard_D2s_v6"' '"platform":"gcp","os":"ubuntu","size":"S"' '"platform":"../aws","os":"ubuntu","size":"S"' '"platform":"azure","os":"windows","size":"S"'; do
   reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{$bad}}"
 done

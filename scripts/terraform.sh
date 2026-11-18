@@ -17,7 +17,7 @@ chmod 700 "$scratch"
 vars_file="$scratch/vm.tfvars.json"
 requested_by=$(yq -r '.metadata.annotations."cf/requested-by"' "$file")
 jq --arg name "$NAME" --arg user "$requested_by" --arg request "$REQUEST_ID" \
-  '{name:$name,os:.compute.os,size:(.compute.size // "S"),instance_type:(.compute.instanceType // ""),team:(.owner|split("/")[-1]),requested_by:$user,request_id:$request,
+  '{name:$name,os:.compute.os,image_version:.compute.imageVersion,size:(.compute.size // "S"),instance_type:(.compute.instanceType // ""),team:(.owner|split("/")[-1]),requested_by:$user,request_id:$request,
     cloud_tags:(.cloudTags + (.billing | with_entries(.key = (if .key=="costCenter" then "cost_center" else "project_code" end))))}' \
   <<< "$SPEC_JSON" > "$vars_file"
 terraform -chdir="$dir" init -input=false -lockfile=readonly \

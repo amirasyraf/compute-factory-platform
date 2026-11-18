@@ -37,6 +37,7 @@ if [[ "$STAGE" == register ]]; then
     noop=true
   else
     [[ ! -e "${INVENTORY_ROOT:-.}/vms/$NAME" ]] || fail 'VM directory exists without inventory'
+    SPEC_JSON=$(python3 scripts/spec.py --register <<< "$SPEC_JSON")
   fi
 elif [[ ! -f "$file" ]]; then
   [[ "$STAGE" == destroy || "$STAGE" == finalize ]] || fail 'Unknown VM'
@@ -54,9 +55,9 @@ else
     load_spec
     team_guard "$TEAM" "$REQUESTER_TEAMS"
     if [[ "$STAGE" == configure ]]; then
-      # Modify replaces compute and configuration; platform, OS and every other section are kept.
-      jq -e --argjson change "$params" '.compute.platform == $change.compute.platform and .compute.os == $change.compute.os' <<< "$SPEC_JSON" >/dev/null \
-        || fail 'Modify cannot change the platform or OS'
+      # The platform and image are immutable, including for inventory without a recorded version.
+      jq -e --argjson change "$params" '.compute | [.platform, .os, .imageVersion] == ($change.compute | [.platform, .os, .imageVersion])' <<< "$SPEC_JSON" >/dev/null \
+        || fail 'Modify cannot change the platform or image'
       SPEC_JSON=$(jq --argjson change "$params" '.compute = $change.compute | .configuration = $change.configuration' <<< "$SPEC_JSON" | python3 scripts/spec.py)
       spec_environment
     fi

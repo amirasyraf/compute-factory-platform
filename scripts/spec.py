@@ -35,7 +35,7 @@ def text(value, limit=256):
     return value
 
 
-def normalize(spec):
+def normalize(spec, registering=False):
     fields(spec, ["type", "owner", "lifecycle", "compute", "configuration", "billing", "cloudTags"],
            ["type", "owner", "compute"])
     if spec["type"] != "vm":
@@ -46,10 +46,23 @@ def normalize(spec):
     if not re.fullmatch(r"[a-z][a-z0-9-]*", owner):
         raise ValueError("Owner must be a default-namespace group")
     compute = spec["compute"]
-    fields(compute, ["platform", "os", "size", "instanceType"], ["platform", "os"])
+    fields(compute, ["platform", "os", "imageVersion", "size", "instanceType"], ["platform", "os"])
     config = platform(compute["platform"])
     if compute["os"] not in config["os"]:
         raise ValueError("Unsupported compute platform or OS")
+    if "imageVersion" in compute:
+        version = text(compute["imageVersion"], 32)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", version):
+            raise ValueError("Invalid image version")
+        if registering:
+            image = config["os"][compute["os"]]
+            if version not in image.get("versions", []):
+                raise ValueError("Image version is not offered on this platform")
+            if compute["platform"] == "azure":
+                images = image.get("galleryImages", {})
+                name = text(images.get(version))
+                if sum(item.lower() == name.lower() for item in images.values()) != 1:
+                    raise ValueError("Each Azure image release must have its own gallery definition")
     # Exactly one of a platform size or an explicit instance type (advanced picker).
     if ("size" in compute) == ("instanceType" in compute):
         raise ValueError("Specify exactly one of compute.size or compute.instanceType")
@@ -103,6 +116,6 @@ if __name__ == "__main__":
         raw = sys.stdin.read(32769)
         if len(raw) > 32768:
             raise ValueError("Spec exceeds 32 KiB")
-        print(json.dumps(normalize(json.loads(raw)), separators=(",", ":")))
+        print(json.dumps(normalize(json.loads(raw), registering="--register" in sys.argv[1:]), separators=(",", ":")))
     except (ValueError, TypeError, KeyError) as error:
         sys.exit(f"Invalid VM spec: {error}")

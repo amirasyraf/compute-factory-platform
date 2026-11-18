@@ -7,6 +7,12 @@ variable "name" {
   }
 }
 
+variable "image_version" {
+  type        = string
+  default     = null
+  description = "OS release to boot; null preserves Ubuntu 26.04 for legacy inventory"
+}
+
 variable "os" {
   type        = string
   default     = "ubuntu"

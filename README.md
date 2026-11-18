@@ -43,7 +43,7 @@ The workflow has only `contents: write` and `id-token: write` permissions.
 | provision | `{}` | Mark provisioning, adopt/apply Terraform (a size change is an in-place stop/modify/start), record outputs, mark frying |
 | baseline/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
 | software | `{}` or `{"remove":["docker"]}` | As above; also removes deselected catalog packages that are no longer desired |
-| configure | `{"compute":{…},"configuration":{"software":[…],"adJoin":bool}}` | Replace desired compute and configuration (platform/OS unchanged), without VM contact |
+| configure | `{"compute":{…},"configuration":{"software":[…],"adJoin":bool}}` | Replace desired compute and configuration (platform and image unchanged), without VM contact |
 | start/stop/reboot | `{}` | `scripts/power.sh` with the platform's `terraform/platforms/<p>/power.sh`, on `cf/instance-id` after checking its `cf:vm`/`cf:request-id` tags; stop clears `cf/public-ip` (Azure deallocates), start records the current one and waits for SSH, reboot waits for a new boot ID |
 | os-update | `{}` | Sign an ephemeral SSH cert, run `ansible/maintain/os-update.yml` (full upgrade, reboot only if required); `cf/status` unchanged |
 | destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state and inventory |
@@ -70,7 +70,7 @@ Fry stages and OS updates need `cf/public-ip`: on a stopped VM (empty IP) they f
 Admission reserves quota and creates the run idempotently by task ID. The run's first stage, the
 mock ServiceNow request, runs inside the IDP (not in this repo); its fake RITM number is shown on
 the run page, not stored in VM inventory or passed to workflows. The IDP then takes the browser to
-the run page; the task also links **Follow provisioning** (`runUrl`) and **Open VM in catalog**.
+the run page; the task also links **Follow Provisioning** (`runUrl`) and **Open VM in Catalog**.
 
 `vm-modify` has one `cf:vm:run` step (`operation: modify`, `compute`, `software`, `adJoin`). The
 IDP VM page opens it prefilled with the VM's current configuration; the VM field is read-only.
@@ -90,7 +90,7 @@ spec:
   type: vm
   owner: group:default/alpha
   lifecycle: poc
-  compute: {platform: aws, os: ubuntu, size: S}   # or platform: azure
+  compute: {platform: aws, os: ubuntu, imageVersion: "26.04", size: S}   # or platform: azure
   configuration: {software: [git, nginx], adJoin: false}
   billing: {costCenter: CC-1234, projectCode: PROJ-5678}
   cloudTags: {environment: test}
@@ -115,6 +115,13 @@ validated platform is `azure`. Azure VMs live in their own resource group `cf-vm
 resource names (`cf-<name>`), a static public IP (kept across stop/start and resize) and an NSG
 allowing SSH. Azure requires an admin key at launch; it exists only in Terraform state and the
 `access` stage disables `authorized_keys`, so only CA certificates log in.
+
+Launch offers one choice per `os.<os>.versions` entry and stores `compute.imageVersion`. The register
+stage checks availability. Terraform uses `image_version`: AWS selects the latest managed AMI tagged
+with both the OS and the selected release; Azure selects the latest bake from the release's distinct
+gallery definition in `os.<os>.galleryImages` (`ubuntu` for 26.04). Publish bakes before advertising
+a release. Keep gallery mappings and AWS images needed by existing VMs. Legacy specs without
+`imageVersion` resolve to Ubuntu 26.04; Modify preserves the original selection and never re-images.
 
 `scripts/spec.py` validates/normalizes types, supported fields and bounds with the Python standard
 library. Supported platforms/OSes are those in the platform directories; software is catalog

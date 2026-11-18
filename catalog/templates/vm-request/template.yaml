@@ -2,12 +2,12 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: vm-request
-  title: Launch a virtual machine
+  title: Launch a Virtual Machine
   description: A team-owned server built from a golden image, with SSH access for your team.
-  # Listed on the IDP Launch page; platform and image cards come before this form (?formData=).
+  # Listed under Compute → Virtual Machines; platform and image cards prefill this form.
   tags: [product]
   annotations:
-    cf/product: Virtual machine
+    cf/product: Virtual Machines
     cf/launch-flow: platform-image
 spec:
   owner: group:default/platform-admins
@@ -16,24 +16,26 @@ spec:
       createButtonText: Launch
   type: infrastructure
   parameters:
-    - title: VM request
+    - title: VM Request
       required: [name, team, compute, configuration, tags]
       properties:
         name:
-          title: VM name
+          title: VM Name
           type: string
           pattern: '^[a-z][a-z0-9-]{2,20}$'
           description: Unique lowercase name, 3–21 characters.
         team:
-          title: Owning team
+          title: Owning Team
           type: string
           ui:field: MyGroupsPicker
         compute:
           title: Compute
           type: object
           additionalProperties: false
+          # The IDP requires an offered release at admission. Keep the transport field
+          # optional for open forms from before the image picker sent a release.
           required: [platform, os]
-          # IDP field: platform/OS selects, size cards (XS-L) with live specs from the chosen cloud, plus an
+          # IDP field: launch selection, size cards (XS-L) with live specs from the chosen cloud, plus an
           # "Advanced" instance-type picker. It submits exactly one of size or instanceType.
           ui:field: VmComputePicker
           properties:
@@ -43,10 +45,14 @@ spec:
               default: aws
               enum: [aws, azure]
             os:
-              title: Operating system
+              title: Operating System
               type: string
               default: ubuntu
-              enum: [ubuntu]
+              pattern: '^[a-z][a-z0-9-]{0,31}$'
+            imageVersion:
+              title: Image Version
+              type: string
+              pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$'
             size:
               title: Size
               type: string
@@ -54,7 +60,7 @@ spec:
               # VmComputePicker preselects S instead.
               enum: [XS, S, M, L]
             instanceType:
-              title: Instance type
+              title: Instance Type
               type: string
               # AWS (m7i.large) or Azure (Standard_D2s_v6); the platform's platform.json pattern is authoritative.
               pattern: '^([a-z][a-z0-9-]*\.[a-z0-9]+|Standard_[A-Za-z0-9_]{2,60})$'
@@ -97,7 +103,7 @@ spec:
               minLength: 1
               maxLength: 256
             extra:
-              title: Additional tags
+              title: Additional Tags
               type: object
               default: {}
               maxProperties: 40
@@ -120,7 +126,7 @@ spec:
           "cloudTags":${{ parameters.tags.extra | default({}) | dump }}}
   output:
     links:
-      - title: Follow provisioning
+      - title: Follow Provisioning
         url: ${{ steps.dispatch.output.runUrl }}
-      - title: Open VM in catalog
+      - title: Open VM in Catalog
         entityRef: resource:default/${{ parameters.name }}

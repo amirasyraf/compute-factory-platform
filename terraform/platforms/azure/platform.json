@@ -6,6 +6,9 @@
       "versions": [
         "26.04"
       ],
+      "galleryImages": {
+        "26.04": "ubuntu"
+      },
       "sshUser": "ubuntu",
       "family": "linux"
     }

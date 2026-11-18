@@ -11,7 +11,7 @@ spec:
       createButtonText: Apply changes
   type: infrastructure
   parameters:
-    - title: Desired configuration
+    - title: Desired Configuration
       description: >-
         The form shows the VM's current configuration. Changing the size restarts the VM (on AWS its
         public IP changes; Azure keeps its static IP). Unchecked software is uninstalled; its data and configuration files are kept.
@@ -44,15 +44,19 @@ spec:
               type: string
               enum: [aws, azure]
             os:
-              title: Operating system
+              title: Operating System
               type: string
-              enum: [ubuntu]
+              pattern: '^[a-z][a-z0-9-]{0,31}$'
+            imageVersion:
+              title: Image Version
+              type: string
+              pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$'
             size:
               title: Size
               type: string
               enum: [XS, S, M, L]
             instanceType:
-              title: Instance type
+              title: Instance Type
               type: string
               # AWS (m7i.large) or Azure (Standard_D2s_v6); the platform's platform.json pattern is authoritative.
               pattern: '^([a-z][a-z0-9-]*\.[a-z0-9]+|Standard_[A-Za-z0-9_]{2,60})$'
