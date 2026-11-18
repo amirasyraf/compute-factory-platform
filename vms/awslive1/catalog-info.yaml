@@ -5,7 +5,7 @@ metadata:
   title: awslive1
   description: ubuntu VM on aws (XS) for team teamb
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/public-ip: "13.211.157.213"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0857304f691dee319"
@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user3
     cf/requested-at: "2026-11-18T02:46:22Z"
     cf/request-id: b7cb1def-d92b-4d3f-ba31-f8e01a2cfcf5
-    cf/run-id: "44226707538"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44226707538
+    cf/run-id: "44226882347"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44226882347
     cf/ready-at: "2026-11-18T02:52:36Z"
 spec:
   type: vm
