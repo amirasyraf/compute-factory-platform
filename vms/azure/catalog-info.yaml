@@ -13,25 +13,15 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T20:36:33Z"
     cf/request-id: be126270-52d0-42b3-bdbb-d2df6e8eb2cc
-    cf/run-id: "44394243420"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44394243420
+    cf/run-id: "44395631190"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44395631190
     cf/ready-at: "2026-11-18T20:45:01Z"
 spec:
   type: vm
   owner: group:default/teama
   lifecycle: poc
-  compute:
-    platform: azure
-    os: ubuntu
-    imageVersion: "26.04"
-    size: XS
-  configuration:
-    software:
-      - git
-      - htop
-      - nginx
-      - docker
-    adJoin: true
+  compute: {"platform": "azure", "os": "ubuntu", "imageVersion": "26.04", "size": "S"}
+  configuration: {"software": ["git", "htop", "nginx", "docker"], "adJoin": true}
   billing:
     costCenter: sdf
     projectCode: asfd
