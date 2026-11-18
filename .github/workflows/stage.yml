@@ -47,6 +47,11 @@ jobs:
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       BACKSTAGE_URL: ${{ vars.BACKSTAGE_URL }}
       BACKSTAGE_TOKEN: ${{ secrets.BACKSTAGE_TOKEN }}
+      # Azure (OIDC, no secret): Terraform azurerm reads ARM_*, the az CLI logs in below.
+      ARM_USE_OIDC: 'true'
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       INVENTORY_ROOT: ${{ github.workspace }}/.current-inventory
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +92,13 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      # AWS above is always the shared base (SSH CA, Terraform state); the VM's own cloud is added here.
+      - uses: azure/login@v3
+        if: steps.validate.outputs.platform == 'azure' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true') || contains(fromJSON('["start","stop","reboot"]'), inputs.stage))
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - uses: hashicorp/setup-terraform@v3
         if: steps.validate.outputs.noop != 'true' && (inputs.stage == 'provision' || (inputs.stage == 'destroy' && steps.cleanup.outputs.proceed == 'true'))
         with:
@@ -109,7 +121,8 @@ jobs:
         if: contains(fromJSON('["start","stop","reboot"]'), inputs.stage) && steps.validate.outputs.noop != 'true'
         env:
           INSTANCE_ID: ${{ steps.validate.outputs.instance_id }}
-          SSH_USER: ubuntu
+          PLATFORM: ${{ steps.validate.outputs.platform }}
+          SSH_USER: ${{ steps.validate.outputs.ssh_user }}
         run: bash scripts/power.sh "$STAGE"
       - name: Run playbook
         if: contains(fromJSON('["baseline","software","ad-join","access","os-update"]'), inputs.stage) && steps.validate.outputs.noop != 'true'

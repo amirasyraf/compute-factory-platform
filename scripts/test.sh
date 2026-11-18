@@ -12,8 +12,11 @@ git config user.name test
 git config user.email test@example.invalid
 git remote add origin "$tmp/remote.git"
 cp -R "$root/scripts" scripts
-mkdir -p terraform/platforms/aws vms ansible
-cp "$root/terraform/platforms/aws/sizes.json" terraform/platforms/aws/
+mkdir -p vms ansible
+for platform in aws azure; do
+  mkdir -p "terraform/platforms/$platform"
+  cp "$root/terraform/platforms/$platform/"{sizes.json,platform.json} "terraform/platforms/$platform/"
+done
 cp "$root/ansible/software-catalog.yml" ansible/
 touch vms/.gitkeep
 git add .
@@ -158,4 +161,25 @@ for bad in '"size":"S","instanceType":"t3.small"' '"size":"XL"' '"instanceType":
   reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{\"platform\":\"aws\",\"os\":\"ubuntu\",$bad}}"
 done
 python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"XS"}}' | jq -e '.compute.size=="XS"'
+# Platform-specific rules come from each platform's platform.json and sizes.json.
+azure='{"type":"vm","owner":"group:default/alpha","compute":{"platform":"azure","os":"ubuntu","instanceType":"Standard_D2s_v6"}}'
+python3 scripts/spec.py <<< "$azure" | jq -e '.compute.instanceType=="Standard_D2s_v6"'
+for bad in '"platform":"azure","os":"ubuntu","instanceType":"t3.small"' '"platform":"aws","os":"ubuntu","instanceType":"Standard_D2s_v6"' '"platform":"gcp","os":"ubuntu","size":"S"' '"platform":"../aws","os":"ubuntu","size":"S"' '"platform":"azure","os":"windows","size":"S"'; do
+  reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{$bad}}"
+done
+for tag in '"azure-env":"x"' '"Microsoft.x":"x"' '"a/b":"x"'; do
+  reject python3 scripts/spec.py <<< "{\"type\":\"vm\",\"owner\":\"group:default/alpha\",\"compute\":{\"platform\":\"azure\",\"os\":\"ubuntu\",\"size\":\"S\"},\"cloudTags\":{$tag}}"
+done
+python3 scripts/spec.py <<< '{"type":"vm","owner":"group:default/alpha","compute":{"platform":"aws","os":"ubuntu","size":"S"},"cloudTags":{"azure-env":"x"}}' >/dev/null
+# Azure inventory: the SSH user and instance ID rules are Azure's.
+NAME=az-vm SPEC_JSON="$(jq -c '.compute={platform:"azure",os:"ubuntu",size:"S"}' <<< "$SPEC_JSON")" bash scripts/inventory.sh register
+yq -e '.metadata.annotations."cf/ssh-user" == "ubuntu"' vms/az-vm/catalog-info.yaml >/dev/null
+azure_id=/subscriptions/74b39a79-f79d-4adb-8ae0-fe9118fc564a/resourceGroups/cf-vm-az-vm/providers/Microsoft.Compute/virtualMachines/cf-az-vm
+NAME=az-vm PUBLIC_IP=192.0.2.20 SSH_USER=ubuntu INSTANCE_ID=$azure_id INSTANCE_TYPE=Standard_D2s_v6 bash scripts/inventory.sh outputs
+NAME=az-vm validate stop
+grep -qx "instance_id=$azure_id" "$GITHUB_OUTPUT"
+grep -qx platform=azure "$GITHUB_OUTPUT"
+NAME=az-vm INSTANCE_ID=i-0123456789abcdef0 PUBLIC_IP=192.0.2.20 SSH_USER=ubuntu INSTANCE_TYPE=x bash scripts/inventory.sh outputs
+NAME=az-vm reject validate stop
+NAME=az-vm bash scripts/inventory.sh delete
 echo 'Offline workflow-helper integration checks passed'

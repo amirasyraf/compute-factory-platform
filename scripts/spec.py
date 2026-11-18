@@ -4,8 +4,20 @@ import re
 import sys
 from pathlib import Path
 
-# The platform's size map (also read by Terraform and the IDP); sizes are its keys.
-SIZES = json.loads((Path(__file__).resolve().parent.parent / "terraform/platforms/aws/sizes.json").read_text())
+# Each platform directory's platform.json (OSes, instance-type rules, reserved tags) and sizes.json
+# (size -> instance type) are the single source of truth, also read by Terraform and the IDP.
+PLATFORMS_DIR = Path(__file__).resolve().parent.parent / "terraform/platforms"
+
+
+def platform(name):
+    if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9-]{1,20}", name):
+        raise ValueError("Unsupported compute platform or OS")
+    try:
+        config = json.loads((PLATFORMS_DIR / name / "platform.json").read_text())
+        config["sizes"] = json.loads((PLATFORMS_DIR / name / "sizes.json").read_text())
+    except FileNotFoundError:
+        raise ValueError("Unsupported compute platform or OS") from None
+    return config
 
 
 def fields(value, allowed, required=()):
@@ -35,17 +47,19 @@ def normalize(spec):
         raise ValueError("Owner must be a default-namespace group")
     compute = spec["compute"]
     fields(compute, ["platform", "os", "size", "instanceType"], ["platform", "os"])
-    if compute["platform"] != "aws" or compute["os"] != "ubuntu":
+    config = platform(compute["platform"])
+    if compute["os"] not in config["os"]:
         raise ValueError("Unsupported compute platform or OS")
-    # Exactly one of a platform size or an explicit EC2 instance type (advanced picker).
+    # Exactly one of a platform size or an explicit instance type (advanced picker).
     if ("size" in compute) == ("instanceType" in compute):
         raise ValueError("Specify exactly one of compute.size or compute.instanceType")
-    if "size" in compute and compute["size"] not in SIZES:
+    if "size" in compute and compute["size"] not in config["sizes"]:
         raise ValueError("Unsupported size")
+    excluded = config.get("excludedInstanceTypePattern")
     if "instanceType" in compute and (
         not isinstance(compute["instanceType"], str)
-        or not re.fullmatch(r"[a-z][a-z0-9-]*\.[a-z0-9]+", compute["instanceType"])
-        or compute["instanceType"].startswith("mac")
+        or not re.fullmatch(config["instanceTypePattern"].removeprefix("^").removesuffix("$"), compute["instanceType"])
+        or (excluded and re.match(excluded, compute["instanceType"]))
     ):
         raise ValueError("Unsupported instance type")
     configuration = spec.get("configuration", {})
@@ -65,11 +79,14 @@ def normalize(spec):
     tags = spec.get("cloudTags", {})
     if not isinstance(tags, dict) or len(tags) > 40:
         raise ValueError("cloudTags must be an object with at most 40 entries")
+    reserved = ("cf:", "billing:", *config["reservedTagPrefixes"])
     for key, value in tags.items():
         text(key, 128)
         # Reserve policy, identity and billing tags; arbitrary user tags cannot override them.
-        if key.lower() in ("name", "cost_center", "project_code") or key.lower().startswith(("cf:", "aws:", "billing:")):
+        if key.lower() in ("name", "cost_center", "project_code") or key.lower().startswith(reserved):
             raise ValueError("Reserved cloud tag")
+        if any(char in config.get("forbiddenTagKeyCharacters", "") for char in key):
+            raise ValueError("Tag key contains a character the platform does not allow")
         if not isinstance(value, str) or len(value) > 256 or any(ord(c) < 32 or ord(c) == 127 for c in value):
             raise ValueError("Tag values must be bounded strings without control characters")
     return {

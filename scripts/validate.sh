@@ -63,10 +63,14 @@ else
   fi
 fi
 if [[ "$noop" == false ]]; then
+  platform_file="terraform/platforms/$PLATFORM/platform.json"
+  FAMILY=$(jq -r --arg os "$OS" '.os[$os].family' "$platform_file")
+  SSH_USER=$(jq -r --arg os "$OS" '.os[$os].sshUser' "$platform_file")
+  export FAMILY
   # Packages deselected by Modify; anything still desired is never removed.
   REMOVE=$(jq -c --argjson keep "$SOFTWARE" '(.remove // []) - $keep | unique' <<< "$params")
   while IFS= read -r package; do
-    supported=$(PACKAGE="$package" yq -r '.[strenv(PACKAGE)].linux // ""' ansible/software-catalog.yml)
+    supported=$(PACKAGE="$package" yq -r '.[strenv(PACKAGE)][strenv(FAMILY)] // ""' ansible/software-catalog.yml)
     [[ -n "$supported" ]] || fail "Unsupported software for $OS: $package"
   done < <(jq -r '.[]' <<< "$SOFTWARE" && jq -r '.[]' <<< "$REMOVE")
 fi
@@ -76,6 +80,7 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "demo_generation=$(jq -r '.demoGeneration // ""' <<< "$params")"
     echo "outcome=$(jq -r '.outcome // ""' <<< "$params")"
     if [[ "$noop" == false ]]; then
+      echo "platform=$PLATFORM"
       echo "spec_json=$SPEC_JSON"
       user=$REQUESTED_BY
       if [[ "$STAGE" != register ]]; then user=$(yq -r '.metadata.annotations."cf/requested-by"' "$file"); fi
@@ -87,15 +92,15 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
         host=$(yq -r '.metadata.annotations."cf/public-ip"' "$file")
         ssh_user=$(yq -r '.metadata.annotations."cf/ssh-user"' "$file")
         [[ -n "$host" ]] || fail 'The VM has no public IP; start it first'
-        [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$ssh_user" == ubuntu ]] || fail 'Invalid SSH target'
+        [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$ssh_user" == "$SSH_USER" ]] || fail 'Invalid SSH target'
         echo "host=$host"
-        echo "ssh_user=$ssh_user"
       fi
       if [[ "$STAGE" =~ ^(start|stop|reboot)$ ]]; then
         instance=$(yq -r '.metadata.annotations."cf/instance-id"' "$file")
-        [[ "$instance" =~ ^i-[0-9a-f]{8,17}$ ]] || fail 'The VM has no recorded instance'
+        [[ "$instance" =~ $(jq -r '.instanceIdPattern' "$platform_file") ]] || fail 'The VM has no recorded instance'
         echo "instance_id=$instance"
       fi
+      echo "ssh_user=$SSH_USER"
     fi
   } >> "$GITHUB_OUTPUT"
 fi

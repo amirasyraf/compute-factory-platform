@@ -3,7 +3,12 @@ kind: Template
 metadata:
   name: vm-request
   title: Request a VM
-  description: Provision a team-owned VM and apply the selected fry stages.
+  description: A team-owned server built from a golden image, with SSH access for your team.
+  # Listed on the IDP Launch page; platform and image cards come before this form (?formData=).
+  tags: [product]
+  annotations:
+    cf/product: Virtual machine
+    cf/launch-flow: platform-image
 spec:
   owner: group:default/platform-admins
   presentation:
@@ -28,15 +33,15 @@ spec:
           type: object
           additionalProperties: false
           required: [platform, os]
-          # IDP field: size cards (XS-L) with live AWS specs, plus an "Advanced" instance-type
-          # picker. It submits exactly one of size or instanceType.
+          # IDP field: platform/OS selects, size cards (XS-L) with live specs from the chosen cloud, plus an
+          # "Advanced" instance-type picker. It submits exactly one of size or instanceType.
           ui:field: VmComputePicker
           properties:
             platform:
               title: Platform
               type: string
               default: aws
-              enum: [aws]
+              enum: [aws, azure]
             os:
               title: Operating system
               type: string
@@ -51,7 +56,8 @@ spec:
             instanceType:
               title: Instance type
               type: string
-              pattern: '^[a-z][a-z0-9-]*\.[a-z0-9]+$'
+              # AWS (m7i.large) or Azure (Standard_D2s_v6); the platform's platform.json pattern is authoritative.
+              pattern: '^([a-z][a-z0-9-]*\.[a-z0-9]+|Standard_[A-Za-z0-9_]{2,60})$'
         configuration:
           title: Configuration
           type: object
@@ -73,7 +79,7 @@ spec:
               default: false
         tags:
           title: Tags
-          description: AWS tags on the VM. cost_center and project_code are required and self-reported (not billing authorization). Do not enter secrets.
+          description: Cloud tags on the VM. cost_center and project_code are required and self-reported (not billing authorization). Do not enter secrets.
           type: object
           additionalProperties: false
           required: [costCenter, projectCode]

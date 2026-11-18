@@ -1,0 +1,20 @@
+{
+  "label": "AWS",
+  "os": {
+    "ubuntu": {
+      "label": "Ubuntu",
+      "versions": [
+        "26.04"
+      ],
+      "sshUser": "ubuntu",
+      "family": "linux"
+    }
+  },
+  "instanceTypePattern": "^[a-z][a-z0-9-]*\\.[a-z0-9]+$",
+  "excludedInstanceTypePattern": "^mac",
+  "instanceIdPattern": "^i-[0-9a-f]{8,17}$",
+  "reservedTagPrefixes": [
+    "aws:"
+  ],
+  "forbiddenTagKeyCharacters": ""
+}

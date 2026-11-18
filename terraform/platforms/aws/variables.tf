@@ -10,10 +10,10 @@ variable "name" {
 variable "os" {
   type        = string
   default     = "ubuntu"
-  description = "Golden image OS tag."
+  description = "Golden image OS tag; a key of platform.json os."
   validation {
-    condition     = contains(["ubuntu"], var.os)
-    error_message = "Supported OS: ubuntu."
+    condition     = contains(keys(jsondecode(file("${path.module}/platform.json")).os), var.os)
+    error_message = "The OS must be a key of platform.json os."
   }
 }
 

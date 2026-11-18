@@ -1,6 +1,6 @@
 # Compute Factory platform
 
-POC AWS VM stage executor, with Git as inventory and Ansible configuration.
+POC VM stage executor for AWS and Azure, with Git as inventory and Ansible configuration.
 The binding cross-repository interfaces are in `../compute-factory/CONTRACTS.md`.
 
 ## Lifecycle
@@ -44,7 +44,7 @@ The workflow has only `contents: write` and `id-token: write` permissions.
 | baseline/ad-join/access | `{}` | Mark frying, sign an ephemeral SSH cert, run the corresponding playbook |
 | software | `{}` or `{"remove":["docker"]}` | As above; also removes deselected catalog packages that are no longer desired |
 | configure | `{"compute":{…},"configuration":{"software":[…],"adJoin":bool}}` | Replace desired compute and configuration (platform/OS unchanged), without VM contact |
-| start/stop/reboot | `{}` | `scripts/power.sh` on `cf/instance-id` after checking its `cf:vm`/`cf:request-id` tags; stop clears `cf/public-ip`, start records the new one and waits for SSH, reboot waits for a new boot ID |
+| start/stop/reboot | `{}` | `scripts/power.sh` with the platform's `terraform/platforms/<p>/power.sh`, on `cf/instance-id` after checking its `cf:vm`/`cf:request-id` tags; stop clears `cf/public-ip` (Azure deallocates), start records the current one and waits for SSH, reboot waits for a new boot ID |
 | os-update | `{}` | Sign an ephemeral SSH cert, run `ansible/maintain/os-update.yml` (full upgrade, reboot only if required); `cf/status` unchanged |
 | destroy | `{}` or `{"demoGeneration":"<uuid>"}` | Check cleanup eligibility if automatic, mark destroying, destroy, delete state and inventory |
 | finalize | `{"outcome":"ready"}` or `{"outcome":"failed"}` | Write status and first-only readiness/failure timestamp |
@@ -90,18 +90,39 @@ spec:
   type: vm
   owner: group:default/alpha
   lifecycle: poc
-  compute: {platform: aws, os: ubuntu, size: S}
+  compute: {platform: aws, os: ubuntu, size: S}   # or platform: azure
   configuration: {software: [git, nginx], adJoin: false}
   billing: {costCenter: CC-1234, projectCode: PROJ-5678}
   cloudTags: {environment: test}
 ```
 
+## Platforms
+
+Each platform is one directory, `terraform/platforms/<p>/` (`aws`, `azure`):
+
+| File | Purpose |
+|---|---|
+| `platform.json` | `label`; `os` (`{<os>: {label, versions, sshUser, family}}`); `instanceTypePattern`, `excludedInstanceTypePattern`, `instanceIdPattern`; `reservedTagPrefixes`, `forbiddenTagKeyCharacters` |
+| `sizes.json` | XS/S/M/L → instance type (AWS `t3.*`; Azure `Standard_D2ls_v6`, `D2s_v6`, `D4ls_v6`, `D4s_v6`) |
+| `*.tf` | the VM root module (same variables and outputs on every platform) |
+| `adopt.sh` | adopt untracked resources of this incarnation into state before apply/destroy |
+| `power.sh` | `vm_describe`, `vm_start`, `vm_stop`, `vm_reboot` for `scripts/power.sh` |
+
+`spec.py`, `validate.sh`, `inventory.sh`, Terraform and the IDP (from `main`, via GitHub) read these
+files; generic scripts do not name a platform. The workflow logs in to AWS for every cloud stage (SSH
+CA, S3 state) and additionally to Azure (`azure/login`, OIDC; Terraform via `ARM_USE_OIDC`) when the
+validated platform is `azure`. Azure VMs live in their own resource group `cf-vm-<name>` with fixed
+resource names (`cf-<name>`), a static public IP (kept across stop/start and resize) and an NSG
+allowing SSH. Azure requires an admin key at launch; it exists only in Terraform state and the
+`access` stage disables `authorized_keys`, so only CA certificates log in.
+
 `scripts/spec.py` validates/normalizes types, supported fields and bounds with the Python standard
-library. Only AWS/Ubuntu and catalog software `[git, htop, nginx, docker]` are supported. Compute
-has exactly one of `size` (XS/S/M/L from `terraform/platforms/aws/sizes.json`) or `instanceType`
-(e.g. `m7i.large`, no `mac*`). Terraform checks x86_64 support and default-subnet AZ availability.
-The IDP Advanced picker reads the same map and live AWS offerings. Recorded `cf/instance-type`
-is the launched type, not a re-evaluation of a mutable size map.
+library. Supported platforms/OSes are those in the platform directories; software is catalog
+`[git, htop, nginx, docker]`. Compute has exactly one of `size` (a key of the platform's `sizes.json`)
+or `instanceType` (the platform's pattern: e.g. `m7i.large`, no `mac*`; `Standard_D2s_v6`). AWS
+Terraform checks x86_64 support and default-subnet AZ availability. The IDP Advanced picker reads the
+same maps and live offerings (Azure with vCPU quota). Recorded `cf/instance-type` is the launched
+type, not a re-evaluation of a mutable size map.
 
 Configuration defaults to no software/no AD join; billing/tags default to empty objects. Modify
 replaces the software list: unchecked catalog packages are removed with `apt` `state: absent`
@@ -110,18 +131,20 @@ replaces the software list: unchecked catalog packages are removed with `apt` `s
 tags come from original persisted provenance, not whoever dispatched the current attempt.
 
 Billing accepts only nonempty `costCenter`/`projectCode` (up to 256 chars), projected as
-`cost_center`/`project_code` AWS tags. Both are required by the form/IDP for new requests but
+`cost_center`/`project_code` cloud tags. Both are required by the form/IDP for new requests but
 optional in `spec.py` for older specs. These are self-reported, not billing authorization.
 Custom tags: at most 40 entries, keys 1–128 chars, string values 0–256 chars. Controls, unknown
 spec section fields and reserved tag keys/prefixes (`Name`, `cost_center`, `project_code`,
-`cf:`, `aws:`, `billing:`, case-insensitive) are rejected. Never store secrets in specs or tags.
+`cf:`, `billing:` and the platform's `reservedTagPrefixes`, case-insensitive) and keys with the
+platform's forbidden characters (Azure `<>%&\?/`) are rejected. Never store secrets in specs or tags.
 
 Backstage stores custom spec fields but does not itself enforce this workflow schema. Git edits
 do not trigger reconciliation or Terraform. Future enterprise sections need explicit validators
 and consumers. Legacy inventory is not migrated; coordinated cut-over starts with empty inventory.
 
 Repository variables: `AWS_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `TF_STATE_BUCKET`
-(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`. Secret: `BACKSTAGE_TOKEN`, subject
+(`cf-tfstate-134584031874-apse2`), `BACKSTAGE_URL`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID`, `AZURE_LOCATION`. Secret: `BACKSTAGE_TOKEN`, subject
 `compute-factory-workflows`, restricted to catalog and the `vms` read-only cleanup check.
 Missing Backstage config skips refresh but automatic cleanup fails closed.
 The IDP must register the optional `cf-vms` glob Location and enable orphan deletion.
@@ -129,12 +152,15 @@ Repo writers and dispatch-token holders can impersonate identity inputs: trusted
 
 ## Terraform retry safety
 
-S3 state is `vms/aws/<name>/terraform.tfstate`, with native `use_lockfile=true`. The script uses
+S3 state is `vms/<platform>/<name>/terraform.tfstate` (Azure state is in the same AWS bucket), with
+native `use_lockfile=true`. The script uses
 `init -lockfile=readonly` so provider checksum files do not dirty inventory rebases. All resources
 carry `cf:poc=true`, `cf:vm`, `cf:team`, and (when nonempty) `cf:request-id` tags.
 
-Before either apply or destroy, recover any **untracked** instance/security group with matching
-`cf:vm`, `cf:request-id` and `cf:poc=true` into Terraform state. Instance lookup includes pending,
+Before either apply or destroy, the platform's `adopt.sh` recovers **untracked** resources into
+Terraform state. AWS: any instance/security group with matching `cf:vm`, `cf:request-id` and
+`cf:poc=true`. Azure: the fixed-name resources in `cf-vm-<name>` once the group's `cf:vm`/
+`cf:request-id`/`cf:poc` tags match (another incarnation's group fails for an operator). For AWS: Instance lookup includes pending,
 running, stopping and stopped states. Zero matches permits creation (apply); one is imported;
 multiple matches fail for operator recovery rather than guessing. Security-group adoption also
 recovers an interrupted apply before instance creation. This does not adopt another incarnation.
@@ -159,8 +185,9 @@ Terraform receives private temporary vars and plan files, removed on exit. Only 
 by the module; `terraform destroy -var name=<name>` remains valid for `./poc down`. Stage destruction
 uses the full persisted vars, deletes the state object only after successful destroy, then removes
 inventory. Missing state after partial destruction is recovered by the same adoption path.
-AWS access is OIDC only. Requirements: default VPC/subnets, a golden AMI tagged `cf:managed=true`
-and `cf:os=ubuntu`, and Secrets Manager `compute-factory/ssh-ca`. SSH ingress is public for this POC.
+AWS and Azure access is OIDC only. Requirements: default VPC/subnets, a golden AMI tagged
+`cf:managed=true` and `cf:os=ubuntu`, an Azure gallery version of `cf-images/cfimages/ubuntu`, and
+Secrets Manager `compute-factory/ssh-ca`. SSH ingress is public for this POC.
 
 ## SSH and demo cleanup
 
@@ -189,25 +216,29 @@ teardown against unrelated resources; shared infra and golden images belong to s
 
 ## Extending and checking
 
-New platforms need the same variables (`name`, `os`, `size`, `instance_type`, `team`,
-`requested_by`, `request_id`, `cloud_tags`), outputs (`public_ip`, `ssh_user`, `instance_id`,
-`instance_type`), validator/identity/adoption rules and OIDC setup. New OSes need a golden image,
-SSH-user mapping, Ansible OS-family tasks and software checks. New stages require contract and
+New platforms need a directory as above with the same variables (`name`, `os`, `size`,
+`instance_type`, `team`, `requested_by`, `request_id`, `cloud_tags`) and outputs (`public_ip`,
+`ssh_user`, `instance_id`, `instance_type`), a login step in `stage.yml`, a golden image and the
+IDP/`./poc` pieces listed in the orchestrator's DESIGN.md §8. New OSes need a golden image, an `os`
+entry in each `platform.json`, Ansible OS-family tasks and software checks. New stages require contract and
 orchestrator stage-list changes as well as playbooks, workflow allowlists and template enums.
 
 Tool versions are pinned in `mise.toml`. Offline verification (no new unit-test framework):
 
 ```bash
-mise exec -- terraform -chdir=terraform/platforms/aws fmt -check
-mise exec -- terraform -chdir=terraform/platforms/aws init -backend=false -lockfile=readonly
-mise exec -- terraform -chdir=terraform/platforms/aws validate
+for p in aws azure; do
+  mise exec -- terraform -chdir=terraform/platforms/$p fmt -check
+  mise exec -- terraform -chdir=terraform/platforms/$p init -backend=false -lockfile=readonly
+  mise exec -- terraform -chdir=terraform/platforms/$p validate
+done
 mise exec -- actionlint
-mise exec -- shellcheck scripts/*.sh
+mise exec -- shellcheck scripts/*.sh terraform/platforms/*/*.sh
 for script in scripts/*.sh; do bash -n "$script"; done
 mise exec -- bash scripts/test.sh
 ```
 
-`scripts/test.sh` uses real jq/yq/Git and an isolated local bare remote to exercise validation,
+`scripts/test.sh` uses real jq/yq/Git and an isolated local bare remote to exercise validation
+(including both platforms' rules),
 inventory idempotency, config unions, provenance, first-time timestamps, missing-inventory
 no-ops and separate current-inventory reads/writes from pinned executor code. It does not
 invoke AWS/Terraform or prove live recovery behavior. Live stage/SSH/adoption

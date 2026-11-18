@@ -27,11 +27,12 @@ case "$action" in
     # shellcheck source=scripts/load-spec.sh
     source "$(dirname "$0")/load-spec.sh"
     spec_environment
+    ssh_user=$(jq -er --arg os "$OS" '.os[$os].sshUser' "terraform/platforms/$PLATFORM/platform.json")
     mkdir -p "$inventory_root/vms/$NAME"
-    jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" \
+    jq -n --arg name "$NAME" --arg team "$TEAM" --arg platform "$PLATFORM" --arg os "$OS" --arg ssh_user "$ssh_user" \
       --arg size "$SIZE" --arg user "${REQUESTED_BY:?}" --arg request "${REQUEST_ID:?}" \
       --arg requested_at "$(date -u +%FT%TZ)" --argjson spec "$SPEC_JSON" \
-      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/public-ip":"","cf/ssh-user":"ubuntu","cf/instance-id":"","cf/instance-type":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/request-id":$request}},spec:$spec}' \
+      '{apiVersion:"backstage.io/v1alpha1",kind:"Resource",metadata:{name:$name,title:$name,description:("\($os) VM on \($platform) (\($size)) for team \($team)"),annotations:{"cf/status":"provisioning","cf/public-ip":"","cf/ssh-user":$ssh_user,"cf/instance-id":"","cf/instance-type":"","cf/requested-by":$user,"cf/requested-at":$requested_at,"cf/request-id":$request}},spec:$spec}' \
       | yq -P '.' > "$file"
     ;;
   configure)

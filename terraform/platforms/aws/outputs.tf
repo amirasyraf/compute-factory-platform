@@ -3,7 +3,7 @@ output "public_ip" {
 }
 
 output "ssh_user" {
-  value = local.ssh_users[var.os]
+  value = local.platform.os[var.os].sshUser
 }
 
 output "instance_id" {

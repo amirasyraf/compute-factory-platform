@@ -12,8 +12,16 @@
     mode: "0755"
 - name: Replace allowed principals with the owning team
   ansible.builtin.copy:
-    dest: /etc/ssh/auth_principals/ubuntu
+    dest: "/etc/ssh/auth_principals/{{ ansible_user }}"
     content: "cf-automation\nteam-platform-admins\nteam-{{ cf_team }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+# Only CA certificates log in. Some clouds (Azure) require an admin key at launch; it stops working here.
+- name: Disable authorized_keys logins
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/01-compute-factory-certificates-only.conf
+    content: "AuthorizedKeysFile none\n"
     owner: root
     group: root
     mode: "0644"

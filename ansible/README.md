@@ -4,7 +4,7 @@ From the repository root, install `pip install -r requirements-ansible.txt`,
 then run each of `baseline`, `software`, `ad-join`, and `access` as follows:
 
 ```sh
-ansible-playbook -i "$host," -u ubuntu --private-key "$key" \
+ansible-playbook -i "$host," -u "$ssh_user" --private-key "$key" \
   --ssh-common-args "-o CertificateFile=$key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
   ansible/fry/baseline.yml -e @vars.json
 ```
@@ -17,12 +17,15 @@ ansible-playbook -i "$host," -u ubuntu --private-key "$key" \
 Playbooks resolve roles relative to their own directory. The SSH CLI arguments
 above supply host-key settings; no Ansible configuration file is required.
 
-The software catalog is the allowlist; unknown or OS-unavailable selections fail
+The software catalog is the allowlist (column per OS family: `linux`, `windows`); unknown or OS-unavailable selections fail
 before installation. The software stage installs `cf_software` and removes
 `cf_software_remove` (`apt` `state: absent`: data and configuration files are kept).
 AD join only records mock metadata and banners: it does not join a domain; with
-`cf_ad_join: false` it removes them again. Access replaces the entire principals file, removing any former
-owning team's access. Baseline owns a marked block in the banners, preserving
+`cf_ad_join: false` it removes them again. Access replaces the entire principals file of the login user
+(`/etc/ssh/auth_principals/<ansible_user>`), removing any former owning team's access, and turns off
+`authorized_keys` logins (`AuthorizedKeysFile none`), so only CA certificates work; Azure's required
+launch-time admin key stops working there. `$ssh_user` is the OS login user from the platform's
+`platform.json` (`ubuntu` for Ubuntu). Baseline owns a marked block in the banners, preserving
 the mock AD join line when stages are re-run independently. Windows tasks fail
 explicitly until implemented.
 
