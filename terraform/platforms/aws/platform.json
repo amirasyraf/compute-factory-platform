@@ -16,5 +16,6 @@
   "reservedTagPrefixes": [
     "aws:"
   ],
-  "forbiddenTagKeyCharacters": ""
+  "forbiddenTagKeyCharacters": "",
+  "staticPublicIp": false
 }

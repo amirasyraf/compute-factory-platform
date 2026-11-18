@@ -13,8 +13,8 @@ spec:
   parameters:
     - title: Desired configuration
       description: >-
-        The form shows the VM's current configuration. Changing the size restarts the VM (its public
-        IP changes). Unchecked software is uninstalled; its data and configuration files are kept.
+        The form shows the VM's current configuration. Changing the size restarts the VM (on AWS its
+        public IP changes; Azure keeps its static IP). Unchecked software is uninstalled; its data and configuration files are kept.
       required: [vm, compute, configuration]
       properties:
         vm:

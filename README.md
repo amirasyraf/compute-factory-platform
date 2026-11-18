@@ -102,7 +102,7 @@ Each platform is one directory, `terraform/platforms/<p>/` (`aws`, `azure`):
 
 | File | Purpose |
 |---|---|
-| `platform.json` | `label`; `os` (`{<os>: {label, versions, sshUser, family}}`); `instanceTypePattern`, `excludedInstanceTypePattern`, `instanceIdPattern`; `reservedTagPrefixes`, `forbiddenTagKeyCharacters` |
+| `platform.json` | `label`; `os` (`{<os>: {label, versions, sshUser, family}}`); `instanceTypePattern`, `excludedInstanceTypePattern`, `instanceIdPattern`; `reservedTagPrefixes`, `forbiddenTagKeyCharacters`; `staticPublicIp` (address kept across stop/start and resize) |
 | `sizes.json` | XS/S/M/L → instance type (AWS `t3.*`; Azure `Standard_D2ls_v6`, `D2s_v6`, `D4ls_v6`, `D4s_v6`) |
 | `*.tf` | the VM root module (same variables and outputs on every platform) |
 | `adopt.sh` | adopt untracked resources of this incarnation into state before apply/destroy |

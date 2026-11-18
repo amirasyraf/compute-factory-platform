@@ -18,5 +18,6 @@
     "microsoft",
     "windows"
   ],
-  "forbiddenTagKeyCharacters": "<>%&\\?/"
+  "forbiddenTagKeyCharacters": "<>%&\\?/",
+  "staticPublicIp": true
 }
