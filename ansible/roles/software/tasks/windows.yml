@@ -1,8 +1,10 @@
 ---
 # winget through the Microsoft.WinGet.Client module (installed for all users by the bake). The
-# winget CLI is not supported as SYSTEM or reliably over SSH; the module is, for machine-wide installs.
+# winget CLI is not supported as SYSTEM or reliably over SSH; the module is, for machine-wide installs,
+# but only in PowerShell 7 (baked), not Windows PowerShell.
 - name: Install catalog packages
   ansible.windows.win_powershell:
+    executable: C:\Program Files\PowerShell\7\pwsh.exe
     parameters:
       Ids: "{{ cf_software | map('extract', cf_catalog, 'windows') | list }}"
     script: |
@@ -23,6 +25,7 @@
 # Only catalog packages deselected by Modify.
 - name: Remove deselected catalog packages
   ansible.windows.win_powershell:
+    executable: C:\Program Files\PowerShell\7\pwsh.exe
     parameters:
       Ids: "{{ cf_software_remove | map('extract', cf_catalog, 'windows') | list }}"
     script: |

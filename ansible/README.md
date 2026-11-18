@@ -30,7 +30,7 @@ holding that family's package ID or `null` (not offered). `spec.py`, `validate.s
 the IDP's software picker read it; unknown or OS-unavailable selections fail before installation.
 The software stage installs `cf_software` and removes `cf_software_remove`: on Linux with `apt`
 (`state: absent`: data and configuration files are kept), on Windows with winget through the
-`Microsoft.WinGet.Client` PowerShell module as SYSTEM, machine-wide and silent (the winget CLI is not
+`Microsoft.WinGet.Client` PowerShell module as SYSTEM in the baked PowerShell 7 (`pwsh.exe`), machine-wide and silent (the winget CLI is not
 supported as SYSTEM and is unreliable over SSH). The module is installed for all users by the bake.
 
 AD join only records mock metadata and banners: it does not join a domain; with
