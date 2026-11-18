@@ -6,15 +6,15 @@ metadata:
   description: ubuntu VM on azure (XS) for team teama
   annotations:
     cf/status: ready
-    cf/public-ip: "20.211.168.125"
+    cf/public-ip: ""
     cf/ssh-user: ubuntu
     cf/instance-id: "/subscriptions/74b39a79-f79d-4adb-8ae0-fe9118fc564a/resourceGroups/cf-vm-azure/providers/Microsoft.Compute/virtualMachines/cf-azure"
     cf/instance-type: "Standard_D2s_v6"
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T20:36:33Z"
     cf/request-id: be126270-52d0-42b3-bdbb-d2df6e8eb2cc
-    cf/run-id: "44396039428"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44396039428
+    cf/run-id: "44397917130"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44397917130
     cf/ready-at: "2026-11-18T20:45:01Z"
 spec:
   type: vm
