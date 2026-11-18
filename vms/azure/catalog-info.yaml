@@ -1,0 +1,37 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: azure
+  title: azure
+  description: ubuntu VM on azure (XS) for team teama
+  annotations:
+    cf/status: provisioning
+    cf/public-ip: ""
+    cf/ssh-user: ubuntu
+    cf/instance-id: ""
+    cf/instance-type: ""
+    cf/requested-by: user1
+    cf/requested-at: "2026-11-18T20:36:33Z"
+    cf/request-id: be126270-52d0-42b3-bdbb-d2df6e8eb2cc
+    cf/run-id: "44392791798"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44392791798
+spec:
+  type: vm
+  owner: group:default/teama
+  lifecycle: poc
+  compute:
+    platform: azure
+    os: ubuntu
+    imageVersion: "26.04"
+    size: XS
+  configuration:
+    software:
+      - git
+      - htop
+      - nginx
+      - docker
+    adJoin: true
+  billing:
+    costCenter: sdf
+    projectCode: asfd
+  cloudTags: {}
