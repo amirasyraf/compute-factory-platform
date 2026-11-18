@@ -6,15 +6,15 @@ metadata:
   description: ubuntu VM on aws (S) for team teama
   annotations:
     cf/status: ready
-    cf/public-ip: ""
+    cf/public-ip: "16.179.204.151"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-01a651436bfd8e159"
     cf/instance-type: "t3.small"
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T20:35:49Z"
     cf/request-id: 962ee430-1d18-4751-896f-de4aab9ee8c9
-    cf/run-id: "44394188293"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44394188293
+    cf/run-id: "44397946398"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44397946398
     cf/ready-at: "2026-11-18T20:42:10Z"
 spec:
   type: vm
