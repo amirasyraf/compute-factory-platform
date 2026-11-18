@@ -5,7 +5,7 @@ metadata:
   title: stewsec2
   description: ubuntu VM on aws (S) for team teama
   annotations:
-    cf/status: ready
+    cf/status: provisioning
     cf/public-ip: "13.239.16.216"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-03c1274d5a74d48c6"
@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-18T03:11:21Z"
     cf/request-id: e0fc7f77-ea0c-4170-911c-d3708b7cdfdc
-    cf/run-id: "44229969566"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44229969566
+    cf/run-id: "44230008920"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44230008920
     cf/ready-at: "2026-11-18T03:17:19Z"
 spec:
   type: vm
