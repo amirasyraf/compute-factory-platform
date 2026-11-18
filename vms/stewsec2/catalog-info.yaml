@@ -5,7 +5,7 @@ metadata:
   title: stewsec2
   description: ubuntu VM on aws (S) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "13.239.16.216"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-03c1274d5a74d48c6"
