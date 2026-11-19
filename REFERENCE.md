@@ -130,8 +130,9 @@ root disk. The shared password is Secrets Manager `compute-factory/vm/<name>` (`
 tags `cf:poc`, `cf:vm`, `cf:request-id`): created once per incarnation (an older incarnation's secret is
 overwritten), deleted on destroy, swept by `./poc down`; the IDP reads it for the owning team.
 
-Launch offers one choice per `os.<os>.versions` entry and stores `compute.imageVersion`. The register
-stage checks availability. Terraform uses `image_version`: AWS selects the latest managed AMI tagged
+Launch shows one card per `os.<os>.versions` entry, enables only currently available images and stores
+`compute.imageVersion`. The IDP rechecks before admitting a new request, and the register stage
+checks availability again. Terraform uses `image_version`: AWS selects the latest managed AMI tagged
 with both the OS and the selected release; Azure selects the latest bake from the release's distinct
 gallery definition in `os.<os>.galleryImages` (`ubuntu` for 26.04, `windows-2025`). Publish bakes before
 advertising a release. Keep gallery mappings and AWS images needed by existing VMs. Legacy specs without
