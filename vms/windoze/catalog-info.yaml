@@ -5,7 +5,7 @@ metadata:
   title: windoze
   description: windows VM on aws (S) for team teama
   annotations:
-    cf/status: ready
+    cf/status: destroying
     cf/public-ip: "3.27.147.176"
     cf/ssh-user: Administrator
     cf/instance-id: "i-04cdd9aea9be422e3"
@@ -13,8 +13,8 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-19T01:52:12Z"
     cf/request-id: 27290e5c-a5b2-463c-aafd-0e7c36c956e4
-    cf/run-id: "44440950536"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44440950536
+    cf/run-id: "44446628193"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44446628193
     cf/ready-at: "2026-11-19T01:59:22Z"
 spec:
   type: vm
