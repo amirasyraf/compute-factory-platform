@@ -5,7 +5,7 @@ metadata:
   title: poc-cycle-smoke
   description: ubuntu VM on aws (XS) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "3.26.45.230"
     cf/ssh-user: ubuntu
     cf/instance-id: "i-0943c6c95cdb7d370"
