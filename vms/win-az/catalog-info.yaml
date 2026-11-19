@@ -5,7 +5,7 @@ metadata:
   title: win-az
   description: windows VM on azure (S) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "68.218.77.169"
     cf/ssh-user: cfadmin
     cf/instance-id: "/subscriptions/74b39a79-f79d-4adb-8ae0-fe9118fc564a/resourceGroups/cf-vm-win-az/providers/Microsoft.Compute/virtualMachines/cf-win-az"
