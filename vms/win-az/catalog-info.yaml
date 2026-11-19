@@ -6,10 +6,10 @@ metadata:
   description: windows VM on azure (S) for team teama
   annotations:
     cf/status: provisioning
-    cf/public-ip: ""
+    cf/public-ip: "68.218.77.169"
     cf/ssh-user: cfadmin
-    cf/instance-id: ""
-    cf/instance-type: ""
+    cf/instance-id: "/subscriptions/74b39a79-f79d-4adb-8ae0-fe9118fc564a/resourceGroups/cf-vm-win-az/providers/Microsoft.Compute/virtualMachines/cf-win-az"
+    cf/instance-type: "Standard_D2s_v6"
     cf/requested-by: user1
     cf/requested-at: "2026-11-19T03:03:48Z"
     cf/request-id: 2fc5eb89-c754-498d-9984-c02e446d85ed
