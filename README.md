@@ -1,8 +1,8 @@
-# Compute Factory platform
+# Vendy platform
 
 POC VM stage executor for AWS and Azure (Ubuntu 26.04, Windows Server 2025), with Git as inventory and
 Ansible configuration.
-The binding cross-repository interfaces are in `../compute-factory/CONTRACTS.md`.
+The binding cross-repository interfaces are in `../vendy/CONTRACTS.md`.
 
 ## Lifecycle
 
@@ -226,7 +226,7 @@ uses `{}` and never contacts this endpoint. Demo expiry is a trigger time, not a
 Trusted manual dispatch can execute **one** stage and is not tracked by the orchestrator:
 
 ```bash
-gh workflow run stage.yml -R amirasyraf/compute-factory-platform \
+gh workflow run stage.yml -R amirasyraf/vendy-platform \
   -f stage=baseline -f name=demo-1 -f request_id='persisted-request-id' \
   -f run_key=42.baseline.1 -f requested_by=amirasyraf -f requester_teams=alpha \
   -f 'params_json={}'

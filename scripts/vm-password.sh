@@ -48,7 +48,7 @@ case "$action" in
           aws secretsmanager tag-resource --secret-id "$secret" --tags "${tags[@]}"
           ;;
         false)
-          aws secretsmanager create-secret --name "$secret" --description "Compute Factory VM $NAME login (POC)" \
+          aws secretsmanager create-secret --name "$secret" --description "Vendy VM $NAME login (POC)" \
             --secret-string "$value" --tags "${tags[@]}" >/dev/null
           ;;
       esac

@@ -19,7 +19,7 @@
     create: true
     marker: "# {mark} compute-factory baseline"
     block: |
-      Compute Factory
+      Vendy
       VM: {{ cf_vm_name }}
       Team: {{ cf_team }}
       Requester: {{ cf_requested_by }}

@@ -70,7 +70,7 @@ data "aws_ami" "golden" {
 
 resource "aws_security_group" "vm" {
   name_prefix = "cf-${var.name}-"
-  description = "Compute Factory ${var.name} SSH (POC)"
+  description = "Compute Factory ${var.name} SSH (POC)" # Preserve the existing security group description.
   vpc_id      = data.aws_vpc.default.id
   ingress {
     from_port   = 22
