@@ -5,7 +5,7 @@ metadata:
   title: windoze
   description: windows VM on aws (S) for team teama
   annotations:
-    cf/status: provisioning
+    cf/status: frying
     cf/public-ip: "3.27.147.176"
     cf/ssh-user: Administrator
     cf/instance-id: "i-04cdd9aea9be422e3"
