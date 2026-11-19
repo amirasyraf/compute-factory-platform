@@ -2,12 +2,13 @@
 
 From the repository root, install `pip install -r requirements-ansible.txt` and
 `ansible-galaxy collection install -r ansible/requirements.yml` (`ansible.windows`,
-pinned), then run each of `baseline`, `software`, `ad-join`, and `access` as follows:
+pinned). To reproduce one stage on an authorized disposable VM, set `stage` to `baseline`,
+`software`, `ad-join`, or `access` and use:
 
 ```sh
 ansible-playbook -i "$host," -u "$ssh_user" --private-key "$key" \
   --ssh-common-args "-o CertificateFile=$key-cert.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30" \
-  ansible/fry/baseline.yml -e @ansible/connection/$family.yml -e @vars.json -e @secret.json
+  "ansible/fry/$stage.yml" -e "@ansible/connection/$family.yml" -e @vars.json -e @secret.json
 ```
 
 `$family` is the OS family from the platform's `platform.json` (`linux` or `windows`). The
@@ -40,7 +41,8 @@ removing any former owning team's access. On Linux it turns off `authorized_keys
 (`AuthorizedKeysFile none`), so only CA certificates work; Azure's required launch-time admin key
 stops working there. The Windows image already has `AuthorizedKeysFile none`, and Windows access sets
 the login user's password to the team's shared one (`cf_admin_password`), replacing the launch
-password. `$ssh_user` is the OS login user from the platform's `platform.json` (`ubuntu`;
+password. Windows marks this shared POC password as non-expiring. `$ssh_user` is the OS login user
+from the platform's `platform.json` (`ubuntu`;
 `Administrator` on AWS Windows, `cfadmin` on Azure Windows, where Azure forbids `Administrator`).
 Baseline owns a marked block in the Linux banners (Windows: the whole
 `C:\ProgramData\ComputeFactory\banner.txt`, the image's SSH banner), preserving the mock AD join line
@@ -54,6 +56,7 @@ not change `cf/status`.
 
 The IDP orchestrator dispatches `stage.yml` once per stage attempt. Its single playbook
 execution step reads the host, SSH user and variables from committed inventory,
-marks the coarse status `frying`, and cleans up ephemeral credentials even on failure.
+marks the coarse status `frying` for fry stages (not OS updates), and uses a final cleanup step to
+remove ephemeral credentials.
 Retries, optional-stage decisions and final failure/ready status belong to the IDP,
 not these playbooks.
