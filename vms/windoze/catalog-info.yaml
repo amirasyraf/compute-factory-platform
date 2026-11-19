@@ -6,10 +6,10 @@ metadata:
   description: windows VM on aws (S) for team teama
   annotations:
     cf/status: provisioning
-    cf/public-ip: ""
+    cf/public-ip: "3.27.147.176"
     cf/ssh-user: Administrator
-    cf/instance-id: ""
-    cf/instance-type: ""
+    cf/instance-id: "i-04cdd9aea9be422e3"
+    cf/instance-type: "t3.large"
     cf/requested-by: user1
     cf/requested-at: "2026-11-19T01:52:12Z"
     cf/request-id: 27290e5c-a5b2-463c-aafd-0e7c36c956e4
