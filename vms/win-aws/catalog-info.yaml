@@ -5,7 +5,7 @@ metadata:
   title: win-aws
   description: windows VM on aws (S) for team teama
   annotations:
-    cf/status: frying
+    cf/status: ready
     cf/public-ip: "3.26.93.35"
     cf/ssh-user: Administrator
     cf/instance-id: "i-0ece90550f954774a"
@@ -13,8 +13,9 @@ metadata:
     cf/requested-by: user1
     cf/requested-at: "2026-11-19T01:30:01Z"
     cf/request-id: c4a7b0f8-57ed-4383-97a2-cb70bbfd2447
-    cf/run-id: "44438911552"
-    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44438911552
+    cf/run-id: "44439034525"
+    cf/run-url: https://github.com/amirasyraf/compute-factory-platform/actions/runs/44439034525
+    cf/ready-at: "2026-11-19T01:43:31Z"
 spec:
   type: vm
   owner: group:default/teama
